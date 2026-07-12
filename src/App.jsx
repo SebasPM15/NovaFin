@@ -277,6 +277,7 @@ export default function App() {
         { id: "config", label: "Configuración" },
         { id: "movimientos", label: "Control mensual" },
         { id: "metas", label: "Metas" },
+        { id: "ayuda", label: "Ayuda/Guía" },
     ];
 
     const ultimaFila = proyeccion[proyeccion.length - 1];
@@ -757,6 +758,52 @@ export default function App() {
                                 )}
                             </div>
                         )}
+                    </div>
+                )}
+
+                {/* ── AYUDA / GUÍA ────────────────────────────────────────────────────── */}
+                {tab === "ayuda" && (
+                    <div className="space-y-6 animate-in">
+                        <div className="bg-[#1F2937]/50 border border-[#F9FAFB]/10 rounded-xl p-5 md:p-8">
+                            <h2 className="text-[#10B981] text-lg font-semibold mb-4" style={{ fontFamily: "'Outfit', sans-serif" }}>Bienvenido a NovaFin 🚀</h2>
+                            <p className="text-[#9CA3AF] text-sm leading-relaxed mb-6">
+                                Este simulador está diseñado para darte control total sobre tus finanzas proyectadas.
+                                La lógica principal se estructura alrededor de dos bolsas o "cuentas" principales que evolucionan mes a mes.
+                            </p>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                                <div className="border border-[#10B981]/20 rounded-lg p-4 bg-[#111827]">
+                                    <h3 className="text-[#10B981] font-semibold mb-2 text-sm uppercase tracking-wider">Cuenta de Ahorros</h3>
+                                    <p className="text-xs text-[#9CA3AF] leading-relaxed">
+                                        Es tu capital de refugio y crecimiento. Se alimenta mes a mes por el "Depósito fijo base" que configuras.
+                                        Es estrictamente de donde se deducirán o descontarán las "Metas" cuando las alcanzas o compras.
+                                    </p>
+                                </div>
+                                <div className="border border-[#3B82F6]/20 rounded-lg p-4 bg-[#111827]">
+                                    <h3 className="text-[#3B82F6] font-semibold mb-2 text-sm uppercase tracking-wider">Cuenta de Gastos</h3>
+                                    <p className="text-xs text-[#9CA3AF] leading-relaxed">
+                                        Es tu dinero circulante para el día a día. Tu sueldo, menos tu depósito de ahorro base, define tu "Disponible Mensual".
+                                        Cualquier gasto que agregues lo descuenta. Si al finalizar el mes te sobra, se irá acumulando al próximo mes.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <h3 className="text-[#F9FAFB] font-medium mb-3">Guía rápida por pestaña</h3>
+                            <ul className="space-y-4 text-sm text-[#9CA3AF]">
+                                <li className="flex flex-col md:flex-row gap-2">
+                                    <strong className="text-[#3B82F6] w-32 shrink-0">1. Configuración</strong>
+                                    <span>Aquí defines tu punto de partida. Tu sueldo, tu esquema básico de ahorro y el rango de la proyección (cuántos meses a futuro quieres ver). También puedes añadir tu cumpleaños para desbloquear etiquetas en la tabla.</span>
+                                </li>
+                                <li className="flex flex-col md:flex-row gap-2">
+                                    <strong className="text-[#3B82F6] w-32 shrink-0">2. Control Mensual</strong>
+                                    <span>La herramienta más poderosa. Si un mes te excedes en gastos, recibes un bono o tuviste una emergencia, lo registras aquí. Si en agosto terminaste con menos de lo proyectado, usa el campo de `Cierre Real del Mes` y toda la proyección en el futuro se corregirá automáticamente.</span>
+                                </li>
+                                <li className="flex flex-col md:flex-row gap-2">
+                                    <strong className="text-[#3B82F6] w-32 shrink-0">3. Metas</strong>
+                                    <span>Añade ese viaje, moto o gadget. La tabla de Resumen te mostrará exactamente en qué fecha tienes suficiente capital acumulado de "Ahorro" para comprarlo sin afectar tu flujo diario.</span>
+                                </li>
+                            </ul>
+                        </div>
                     </div>
                 )}
 
