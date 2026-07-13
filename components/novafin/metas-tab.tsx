@@ -147,7 +147,7 @@ export function MetasTab({
 
       {/* Table */}
       <div className="overflow-x-auto rounded-xl border border-border">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm min-w-[700px]">
           <thead>
             <tr className="border-b border-border text-left text-[11px] text-muted-foreground">
               <th className="px-3 py-2.5 font-medium">Sim.</th>
@@ -186,7 +186,16 @@ export function MetasTab({
                       {m.prioridad}
                     </span>
                   </td>
-                  <td className="px-3 py-2.5 text-right tnum">${fmt(m.precio)}</td>
+                  <td className="px-3 py-2.5">
+                    <MoneyInput
+                      className="w-28 ml-auto"
+                      value={m.precio || ""}
+                      onChange={(v) => {
+                         setMetas(prev => prev.map(x => x.id === m.id ? { ...x, precio: Number(v) || 0 } : x))
+                      }}
+                      placeholder="0.00"
+                    />
+                  </td>
                   <td className="px-3 py-2.5">
                     <input
                       type="checkbox"

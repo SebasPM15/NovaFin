@@ -42,10 +42,21 @@ export function TextInput({
 }) {
   return (
     <input
-      type={type}
+      type={type === "number" ? "text" : type}
+      inputMode={type === "number" ? "decimal" : undefined}
       value={value}
       placeholder={placeholder}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={(e) => {
+        if (type === "number") {
+          let v = e.target.value.replace(/,/g, ".")
+          v = v.replace(/[^0-9.-]/g, "")
+          const parts = v.split(".")
+          if (parts.length > 2) v = parts[0] + "." + parts.slice(1).join("")
+          onChange(v)
+        } else {
+          onChange(e.target.value)
+        }
+      }}
       onKeyDown={(e) => {
         if (e.key === "Enter" && !e.nativeEvent.isComposing && e.keyCode !== 229) onEnter?.()
       }}
@@ -88,11 +99,17 @@ export function MoneyInput({
         $
       </span>
       <input
-        type="number"
+        type="text"
         inputMode="decimal"
         value={value}
         placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => {
+          let v = e.target.value.replace(/,/g, ".")
+          v = v.replace(/[^0-9.-]/g, "")
+          const parts = v.split(".")
+          if (parts.length > 2) v = parts[0] + "." + parts.slice(1).join("")
+          onChange(v)
+        }}
         onKeyDown={(e) => {
           if (e.key === "Enter" && !e.nativeEvent.isComposing && e.keyCode !== 229) onEnter?.()
         }}

@@ -32,7 +32,7 @@ export function ProjectionChart({ proyeccion }: { proyeccion: Fila[] }) {
             tick={{ fill: "var(--color-muted-foreground)", fontSize: 11 }}
             axisLine={{ stroke: "var(--color-border)" }}
             tickLine={false}
-            interval={interval}
+            minTickGap={25}
           />
           <YAxis
             tick={{ fill: "var(--color-muted-foreground)", fontSize: 11 }}
