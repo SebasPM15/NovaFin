@@ -3,14 +3,14 @@
 import { useState } from "react"
 import {
   ArrowLeft, ArrowRight, Check, PiggyBank, Plus, Sparkles, Wallet,
-  CalendarRange, Banknote, Settings2, Trash2
+  CalendarRange, Settings2, Trash2
 } from "lucide-react"
 import {
   type Config, type Cuenta, type ModeloCuentas,
   DEFAULT_CONFIG, DEFAULT_CUENTA_AHORRO, DEFAULT_CUENTA_GASTOS, DEFAULT_CUENTA_SINGLE,
   addMonths, fmt, monthLabel, nowKey, uid, defaultCuentasForModelo,
 } from "@/lib/finance"
-import { Field, MoneyInput, TextInput } from "./ui-kit"
+import { Field, MoneyInput, TextInput, parseDecimal, toneFromTipo } from "./ui-kit"
 import { cn } from "@/lib/utils"
 
 // ── Step definitions ──────────────────────────────────────────────────────────
@@ -35,14 +35,14 @@ function ProfileCard({
   title,
   description,
   badge,
-}: {
+}: Readonly<{
   selected: boolean
   onSelect: () => void
   icon: React.ReactNode
   title: string
   description: string
   badge?: string
-}) {
+}>) {
   return (
     <button
       type="button"
@@ -73,10 +73,10 @@ function ProfileCard({
 function CustomAccountEditor({
   cuentas,
   onChange,
-}: {
+}: Readonly<{
   cuentas: Cuenta[]
   onChange: (cuentas: Cuenta[]) => void
-}) {
+}>) {
   const add = () =>
     onChange([
       ...cuentas,
@@ -118,21 +118,21 @@ function CustomAccountEditor({
               </button>
             )}
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Saldo inicial">
               <MoneyInput
-                tone={c.tipo === "ahorro" ? "ahorro" : c.tipo === "gastos" ? "gastos" : "neutral"}
+                tone={toneFromTipo(c.tipo)}
                 value={c.saldoInicial || ""}
-                onChange={(v) => patch(c.id, { saldoInicial: Number(v) })}
-                placeholder="0.00"
+                onChange={(v) => patch(c.id, { saldoInicial: parseDecimal(v) || 0 })}
+                placeholder="0,00"
               />
             </Field>
             <Field label="Depósito mensual">
               <MoneyInput
-                tone={c.tipo === "ahorro" ? "ahorro" : c.tipo === "gastos" ? "gastos" : "neutral"}
+                tone={toneFromTipo(c.tipo)}
                 value={c.depositoFijoMensual || ""}
-                onChange={(v) => patch(c.id, { depositoFijoMensual: Number(v) })}
-                placeholder="0.00"
+                onChange={(v) => patch(c.id, { depositoFijoMensual: parseDecimal(v) || 0 })}
+                placeholder="0,00"
               />
             </Field>
           </div>
@@ -143,8 +143,8 @@ function CustomAccountEditor({
             >
               <MoneyInput
                 value={c.limiteGasto || ""}
-                onChange={(v) => patch(c.id, { limiteGasto: Number(v) })}
-                placeholder="0.00"
+                onChange={(v) => patch(c.id, { limiteGasto: parseDecimal(v) || 0 })}
+                placeholder="0,00"
               />
             </Field>
           )}
@@ -163,7 +163,7 @@ function CustomAccountEditor({
 }
 
 // ── Main wizard ───────────────────────────────────────────────────────────────
-export function OnboardingWizard({ onComplete }: { onComplete: (config: Config) => void }) {
+export function OnboardingWizard({ onComplete }: Readonly<{ onComplete: (config: Config) => void }>) {
   const [modelo, setModelo] = useState<ModeloCuentas>("dual")
   const [cuentasCustom, setCuentasCustom] = useState<Cuenta[]>([
     { id: uid(), nombre: "", tipo: "ahorro", saldoInicial: 0, depositoFijoMensual: 0 },
@@ -173,9 +173,6 @@ export function OnboardingWizard({ onComplete }: { onComplete: (config: Config) 
   const [draft, setDraft] = useState<Config>({ ...DEFAULT_CONFIG, mesInicio: nowKey() })
 
   const set = (patch: Partial<Config>) => setDraft((d) => ({ ...d, ...patch }))
-
-  // Total steps depends on model
-  const totalSteps = modelo === "custom" ? 5 : 4 // 0: modelo, 1?: cuentas, 2: reparto, 3: saldos, 4: horizonte
 
   const STEPS_DUAL_SINGLE = ["Modelo", "Reparto mensual", "Saldos actuales", "Horizonte"]
   const STEPS_CUSTOM = ["Modelo", "Tus cuentas", "Reparto mensual", "Saldos actuales", "Horizonte"]
@@ -233,16 +230,16 @@ export function OnboardingWizard({ onComplete }: { onComplete: (config: Config) 
         <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-xl">
           {/* Progress */}
           <div className="flex items-center gap-2 border-b border-border px-6 py-4">
-            {STEPS.map((label, i) => (
+            {STEPS.map((label, i) => {
+              let stepClass = "bg-secondary text-muted-foreground"
+              if (i < step) stepClass = "bg-primary text-primary-foreground"
+              else if (i === step) stepClass = "bg-primary/20 text-primary ring-2 ring-primary"
+              return (
               <div key={label} className="flex flex-1 items-center gap-2">
                 <span
                   className={cn(
                     "grid size-6 shrink-0 place-items-center rounded-full text-[11px] font-semibold transition-colors",
-                    i < step
-                      ? "bg-primary text-primary-foreground"
-                      : i === step
-                        ? "bg-primary/20 text-primary ring-2 ring-primary"
-                        : "bg-secondary text-muted-foreground",
+                    stepClass,
                   )}
                 >
                   {i < step ? <Check className="size-3.5" /> : i + 1}
@@ -251,7 +248,8 @@ export function OnboardingWizard({ onComplete }: { onComplete: (config: Config) 
                   <span className={cn("h-px flex-1", i < step ? "bg-primary" : "bg-border")} />
                 )}
               </div>
-            ))}
+              )
+            })}
           </div>
 
           <div className="px-6 py-7">
@@ -332,24 +330,24 @@ export function OnboardingWizard({ onComplete }: { onComplete: (config: Config) 
                   </p>
                 </div>
                 <Field label="Sueldo mensual">
-                  <MoneyInput value={draft.sueldo || ""} onChange={(v) => set({ sueldo: Number(v) })} placeholder="0.00" />
+                  <MoneyInput value={draft.sueldo || ""} onChange={(v) => set({ sueldo: parseDecimal(v) || 0 })} placeholder="0,00" />
                 </Field>
                 {modelo === "dual" && (
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <Field label="Depósito a Ahorro / mes">
                       <MoneyInput
                         tone="ahorro"
                         value={draft.ahorroBase || ""}
-                        onChange={(v) => set({ ahorroBase: Number(v) })}
-                        placeholder="0.00"
+                        onChange={(v) => set({ ahorroBase: parseDecimal(v) || 0 })}
+                        placeholder="0,00"
                       />
                     </Field>
                     <Field label="Disponible para Gastos / mes">
                       <MoneyInput
                         tone="gastos"
                         value={draft.gastoBase || ""}
-                        onChange={(v) => set({ gastoBase: Number(v) })}
-                        placeholder="0.00"
+                        onChange={(v) => set({ gastoBase: parseDecimal(v) || 0 })}
+                        placeholder="0,00"
                       />
                     </Field>
                   </div>
@@ -361,8 +359,8 @@ export function OnboardingWizard({ onComplete }: { onComplete: (config: Config) 
                   >
                     <MoneyInput
                       value={draft.gastoBase || ""}
-                      onChange={(v) => set({ gastoBase: Number(v) })}
-                      placeholder="0.00"
+                      onChange={(v) => set({ gastoBase: parseDecimal(v) || 0 })}
+                      placeholder="0,00"
                     />
                   </Field>
                 )}
@@ -404,16 +402,16 @@ export function OnboardingWizard({ onComplete }: { onComplete: (config: Config) 
                       <MoneyInput
                         tone="ahorro"
                         value={draft.ahorroActual || ""}
-                        onChange={(v) => set({ ahorroActual: Number(v) })}
-                        placeholder="0.00"
+                        onChange={(v) => set({ ahorroActual: parseDecimal(v) || 0 })}
+                        placeholder="0,00"
                       />
                     </Field>
                     <Field label="Sobrante inicial en Gastos" hint="Dinero disponible que traes del mes anterior.">
                       <MoneyInput
                         tone="gastos"
                         value={draft.gastosActual || ""}
-                        onChange={(v) => set({ gastosActual: Number(v) })}
-                        placeholder="0.00"
+                        onChange={(v) => set({ gastosActual: parseDecimal(v) || 0 })}
+                        placeholder="0,00"
                       />
                     </Field>
                   </>
@@ -422,8 +420,8 @@ export function OnboardingWizard({ onComplete }: { onComplete: (config: Config) 
                   <Field label="Saldo actual de tu cuenta" hint="El balance total que tienes ahora mismo.">
                     <MoneyInput
                       value={draft.ahorroActual || ""}
-                      onChange={(v) => set({ ahorroActual: Number(v) })}
-                      placeholder="0.00"
+                      onChange={(v) => set({ ahorroActual: parseDecimal(v) || 0 })}
+                      placeholder="0,00"
                     />
                   </Field>
                 )}
@@ -444,7 +442,7 @@ export function OnboardingWizard({ onComplete }: { onComplete: (config: Config) 
                   <h2 className="font-display text-lg font-bold text-foreground">¿Qué horizonte quieres ver?</h2>
                   <p className="mt-1 text-sm text-muted-foreground">Elige desde cuándo y cuántos meses proyectar.</p>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <Field label="Mes de inicio">
                     <TextInput type="month" value={draft.mesInicio} onChange={(v) => set({ mesInicio: v || nowKey() })} />
                   </Field>
@@ -452,7 +450,7 @@ export function OnboardingWizard({ onComplete }: { onComplete: (config: Config) 
                     <TextInput
                       type="number"
                       value={draft.mesesAProyectar}
-                      onChange={(v) => set({ mesesAProyectar: Math.max(1, Math.min(120, Number(v) || 1)) })}
+                      onChange={(v) => set({ mesesAProyectar: Math.max(1, Math.min(120, parseDecimal(v) || 1)) })}
                     />
                   </Field>
                 </div>
@@ -460,7 +458,8 @@ export function OnboardingWizard({ onComplete }: { onComplete: (config: Config) 
                   <CalendarRange className="mt-0.5 size-5 shrink-0 text-primary" />
                   <p className="text-sm leading-relaxed text-muted-foreground">
                     Proyectaremos desde{" "}
-                    <strong className="text-foreground">{monthLabel(draft.mesInicio, true)}</strong> hasta{" "}
+                    <strong className="text-foreground">{monthLabel(draft.mesInicio, true)}</strong>
+                    {" "}hasta{" "}
                     <strong className="text-foreground">
                       {monthLabel(addMonths(draft.mesInicio, draft.mesesAProyectar - 1), true)}
                     </strong>

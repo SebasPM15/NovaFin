@@ -15,7 +15,7 @@ import {
   primerMesQueAlcanza,
   uid,
 } from "@/lib/finance"
-import { Field, MoneyInput, Panel, TextInput } from "./ui-kit"
+import { Field, MoneyInput, Panel, TextInput, parseDecimal } from "./ui-kit"
 import { cn } from "@/lib/utils"
 
 const PRIORIDAD_STYLE: Record<Prioridad, string> = {
@@ -24,19 +24,38 @@ const PRIORIDAD_STYLE: Record<Prioridad, string> = {
   Baja: "border-accent/40 bg-accent/10 text-accent",
 }
 
+function markMetaComprada(
+  meta: Meta,
+  allMetas: Meta[],
+  config: Config,
+  gastosPorMes: GastosPorMes,
+): Meta {
+  if (meta.comprado) return { ...meta, comprado: false, mesComprado: null }
+  const proy = generarProyeccion(
+    config,
+    gastosPorMes,
+    allMetas.filter((x) => x.id !== meta.id || !x.comprado),
+  )
+  return {
+    ...meta,
+    comprado: true,
+    mesComprado: primerMesQueAlcanza(proy, meta.precio) || config.mesInicio,
+  }
+}
+
 export function MetasTab({
   config,
   proyeccion,
   metas,
   setMetas,
   gastosPorMes,
-}: {
+}: Readonly<{
   config: Config
   proyeccion: Fila[]
   metas: Meta[]
   setMetas: Dispatch<SetStateAction<Meta[]>>
   gastosPorMes: GastosPorMes
-}) {
+}>) {
   const [nueva, setNueva] = useState<{ nombre: string; categoria: string; precio: string; prioridad: Prioridad }>({
     nombre: "",
     categoria: "",
@@ -46,14 +65,14 @@ export function MetasTab({
   const [seleccion, setSeleccion] = useState<string[]>([])
 
   const agregar = () => {
-    if (!nueva.nombre.trim() || !Number(nueva.precio)) return
+    if (!nueva.nombre.trim() || !parseDecimal(nueva.precio)) return
     setMetas((prev) => [
       ...prev,
       {
         id: uid(),
         nombre: nueva.nombre.trim(),
         categoria: nueva.categoria.trim(),
-        precio: Number(nueva.precio),
+        precio: parseDecimal(nueva.precio),
         prioridad: nueva.prioridad,
         comprado: false,
         mesComprado: null,
@@ -68,22 +87,14 @@ export function MetasTab({
   }
 
   const toggleComprado = (id: string) => {
-    setMetas((prev) =>
-      prev.map((m) => {
-        if (m.id !== id) return m
-        if (m.comprado) return { ...m, comprado: false, mesComprado: null }
-        const proy = generarProyeccion(
-          config,
-          gastosPorMes,
-          prev.filter((x) => x.id !== id || !x.comprado),
-        )
-        return { ...m, comprado: true, mesComprado: primerMesQueAlcanza(proy, m.precio) || config.mesInicio }
-      }),
-    )
+    setMetas((prev) => prev.map((m) => (m.id === id ? markMetaComprada(m, prev, config, gastosPorMes) : m)))
   }
 
   const cambiarMes = (id: string, mes: string) =>
     setMetas((prev) => prev.map((m) => (m.id === id ? { ...m, mesComprado: mes } : m)))
+
+  const setPrecio = (id: string, precio: number) =>
+    setMetas((prev) => prev.map((x) => (x.id === id ? { ...x, precio } : x)))
 
   const toggleSim = (id: string) =>
     setSeleccion((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
@@ -101,8 +112,8 @@ export function MetasTab({
           <Target className="size-4 text-primary" />
           <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Nueva meta</span>
         </div>
-        <div className="flex flex-wrap items-end gap-3">
-          <Field label="Artículo" className="min-w-[180px] flex-1">
+        <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-2 lg:grid-cols-12">
+          <Field label="Artículo" className="sm:col-span-2 lg:col-span-4">
             <TextInput
               value={nueva.nombre}
               onChange={(v) => setNueva({ ...nueva, nombre: v })}
@@ -110,7 +121,7 @@ export function MetasTab({
               onEnter={agregar}
             />
           </Field>
-          <Field label="Categoría" className="w-36">
+          <Field label="Categoría" className="lg:col-span-2">
             <TextInput
               value={nueva.categoria}
               onChange={(v) => setNueva({ ...nueva, categoria: v })}
@@ -118,14 +129,14 @@ export function MetasTab({
               onEnter={agregar}
             />
           </Field>
-          <Field label="Precio" className="w-32">
-            <MoneyInput value={nueva.precio} onChange={(v) => setNueva({ ...nueva, precio: v })} placeholder="0.00" onEnter={agregar} />
+          <Field label="Precio" className="lg:col-span-2">
+            <MoneyInput value={nueva.precio} onChange={(v) => setNueva({ ...nueva, precio: v })} placeholder="0,00" onEnter={agregar} />
           </Field>
-          <Field label="Prioridad" className="w-32">
+          <Field label="Prioridad" className="lg:col-span-2">
             <select
               value={nueva.prioridad}
               onChange={(e) => setNueva({ ...nueva, prioridad: e.target.value as Prioridad })}
-              className="w-full rounded-lg border border-input bg-background/60 px-3 py-2 text-sm text-foreground outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+              className="min-h-11 w-full rounded-lg border border-input bg-background/60 px-3 py-2.5 text-base text-foreground outline-none focus:border-ring focus:ring-2 focus:ring-ring/30 sm:min-h-0 sm:py-2 sm:text-sm"
             >
               {PRIORIDADES.map((p) => (
                 <option key={p} value={p}>
@@ -137,7 +148,7 @@ export function MetasTab({
           <button
             type="button"
             onClick={agregar}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+            className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 sm:min-h-0 sm:w-auto lg:col-span-2"
           >
             <Plus className="size-4" />
             Añadir
@@ -190,10 +201,8 @@ export function MetasTab({
                     <MoneyInput
                       className="w-28 ml-auto"
                       value={m.precio || ""}
-                      onChange={(v) => {
-                         setMetas(prev => prev.map(x => x.id === m.id ? { ...x, precio: Number(v) || 0 } : x))
-                      }}
-                      placeholder="0.00"
+                      onChange={(v) => setPrecio(m.id, parseDecimal(v) || 0)}
+                      placeholder="0,00"
                     />
                   </td>
                   <td className="px-3 py-2.5">

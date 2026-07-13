@@ -13,7 +13,7 @@ import {
   type SaldosReales,
   fmt, monthLabel, uid, cuentaGastosId, cuentaAhorroId,
 } from "@/lib/finance"
-import { Field, MoneyInput, Segmented, TextInput } from "./ui-kit"
+import { Field, MoneyInput, Segmented, TextInput, parseDecimal, toneFromTipo } from "./ui-kit"
 import { cn } from "@/lib/utils"
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -61,8 +61,8 @@ function IngresosPanel({
     })
   }, [cuentas])
 
-  const total = Number(montoTotal) || 0
-  const sumaDist = Object.values(distribucion).reduce((sum, val) => sum + (Number(val) || 0), 0)
+  const total = parseDecimal(montoTotal) || 0
+  const sumaDist = Object.values(distribucion).reduce((sum, val) => sum + (parseDecimal(val) || 0), 0)
   const distribOk = total > 0 && Math.abs(sumaDist - total) < 0.01
 
   const agregar = () => {
@@ -74,7 +74,7 @@ function IngresosPanel({
     const dist = isSingle 
       ? [{ cuentaId: cuentas[0].id, monto: total }]
       : cuentas
-          .map((c) => ({ cuentaId: c.id, monto: Number(distribucion[c.id]) || 0 }))
+          .map((c) => ({ cuentaId: c.id, monto: parseDecimal(distribucion[c.id]) || 0 }))
           .filter((d) => d.monto !== 0)
 
     const nuevo: IngresoExtra = { id: uid(), concepto: concepto.trim(), montoTotal: total, distribucion: dist }
@@ -152,7 +152,7 @@ function IngresosPanel({
           onEnter={agregar}
         />
         <Field label="Monto total del ingreso">
-          <MoneyInput value={montoTotal} onChange={setMontoTotal} placeholder="0.00" onEnter={agregar} />
+          <MoneyInput value={montoTotal} onChange={setMontoTotal} placeholder="0,00" onEnter={agregar} />
         </Field>
 
         {total > 0 && cuentas.length > 1 && (
@@ -161,17 +161,17 @@ function IngresosPanel({
               Distribución entre cuentas — quedan: <span className={cn("tnum font-semibold", distribOk ? "text-primary" : "text-destructive")}>${fmt(total - sumaDist)}</span>
             </div>
             {cuentas.map((c) => (
-              <div key={c.id} className="flex items-center gap-2">
-                <span className={cn("flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-medium shrink-0 min-w-28", cuentaColor(c))}>
+              <div key={c.id} className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+                <span className={cn("flex max-w-full items-center gap-1.5 truncate rounded-md border px-2 py-1.5 text-[11px] font-medium sm:max-w-[40%] sm:shrink-0 sm:min-w-28", cuentaColor(c))}>
                   {cuentaIcon(c)}
-                  {c.nombre || "General"}
+                  <span className="truncate">{c.nombre || "General"}</span>
                 </span>
                 <MoneyInput
-                  tone={c.tipo === "ahorro" ? "ahorro" : c.tipo === "gastos" ? "gastos" : "neutral"}
-                  className="flex-1"
+                  tone={toneFromTipo(c.tipo)}
+                  className="w-full sm:flex-1"
                   value={distribucion[c.id] ?? ""}
                   onChange={(v) => setDistribucion((prev: Record<string, string>) => ({ ...prev, [c.id]: v }))}
-                  placeholder="0.00"
+                  placeholder="0,00"
                   onEnter={agregar}
                 />
               </div>
@@ -248,7 +248,7 @@ export function ControlTab({
   const [errorGasto, setErrorGasto] = useState("")
 
   const agregarGasto = () => {
-    const monto = Number(nuevoGasto.monto)
+    const monto = parseDecimal(nuevoGasto.monto)
     if (!nuevoGasto.concepto.trim()) return setErrorGasto("Ponle un nombre al gasto.")
     if (!monto || monto <= 0) return setErrorGasto("El monto debe ser mayor a 0.")
     if (usado + monto > disponible + 0.001)
@@ -272,7 +272,7 @@ export function ControlTab({
   const [errorAjuste, setErrorAjuste] = useState("")
 
   const agregarAjuste = () => {
-    const abs = Number(nuevoAjuste.monto)
+    const abs = parseDecimal(nuevoAjuste.monto)
     if (!nuevoAjuste.concepto.trim()) return setErrorAjuste("Ponle un nombre al retiro/aporte.")
     if (!abs || abs <= 0) return setErrorAjuste("El monto debe ser mayor a 0.")
     const monto = nuevoAjuste.tipo === "retiro" ? -abs : abs
@@ -352,10 +352,10 @@ export function ControlTab({
               placeholder="Concepto (ej. mercado)"
               onEnter={agregarGasto}
             />
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
               <MoneyInput
                 tone="gastos"
-                className="flex-1"
+                className="w-full sm:flex-1"
                 value={nuevoGasto.monto}
                 onChange={(v) => setNuevoGasto({ ...nuevoGasto, monto: v })}
                 placeholder="Monto"
@@ -364,7 +364,7 @@ export function ControlTab({
               <button
                 type="button"
                 onClick={agregarGasto}
-                className="inline-flex items-center gap-1 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90"
+                className="inline-flex min-h-11 w-full items-center justify-center gap-1 rounded-lg bg-accent px-3 py-2.5 text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90 sm:min-h-0 sm:w-auto sm:py-2"
               >
                 <Plus className="size-4" />
                 Añadir
@@ -438,8 +438,9 @@ export function ControlTab({
               placeholder="Motivo (ej. Navidad)"
               onEnter={agregarAjuste}
             />
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col gap-2">
               <Segmented
+                className="flex w-full"
                 value={nuevoAjuste.tipo}
                 onChange={(t) => setNuevoAjuste({ ...nuevoAjuste, tipo: t })}
                 options={[
@@ -447,21 +448,24 @@ export function ControlTab({
                   { value: "aporte", label: "Aporte" },
                 ]}
               />
-              <MoneyInput
-                tone="ahorro"
-                className="flex-1"
-                value={nuevoAjuste.monto}
-                onChange={(v) => setNuevoAjuste({ ...nuevoAjuste, monto: v })}
-                placeholder="Monto"
-                onEnter={agregarAjuste}
-              />
-              <button
-                type="button"
-                onClick={agregarAjuste}
-                className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
-              >
-                <Plus className="size-4" />
-              </button>
+              <div className="flex gap-2">
+                <MoneyInput
+                  tone="ahorro"
+                  className="min-w-0 flex-1"
+                  value={nuevoAjuste.monto}
+                  onChange={(v) => setNuevoAjuste({ ...nuevoAjuste, monto: v })}
+                  placeholder="Monto"
+                  onEnter={agregarAjuste}
+                />
+                <button
+                  type="button"
+                  onClick={agregarAjuste}
+                  aria-label="Registrar ajuste"
+                  className="inline-flex min-h-11 shrink-0 items-center justify-center gap-1 rounded-lg bg-primary px-3 py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 sm:min-h-0 sm:py-2"
+                >
+                  <Plus className="size-4" />
+                </button>
+              </div>
             </div>
             {errorAjuste && <p className="text-xs text-destructive">{errorAjuste}</p>}
           </div>
@@ -545,10 +549,10 @@ function CierreReal({
   return (
     <div className="border-t border-border/60 pt-4">
       <Field label="Cierre real del mes">
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
           <MoneyInput
             tone={tone}
-            className="flex-1"
+            className="w-full sm:flex-1"
             value={value ?? ""}
             onChange={onChange}
             placeholder={`Proyectado: ${fmt(proyectado)}`}
@@ -557,7 +561,7 @@ function CierreReal({
             <button
               type="button"
               onClick={onClear}
-              className="shrink-0 rounded-lg border border-destructive/30 px-3 text-xs text-destructive transition-colors hover:bg-destructive/10"
+              className="min-h-11 shrink-0 rounded-lg border border-destructive/30 px-3 text-xs text-destructive transition-colors hover:bg-destructive/10 sm:min-h-0"
             >
               Usar proy.
             </button>

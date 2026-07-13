@@ -9,7 +9,7 @@ import {
   type Config, type Cuenta, type ModeloCuentas, type ModificadorBase,
   fmt, uid, defaultCuentasForModelo,
 } from "@/lib/finance"
-import { Field, MoneyInput, Panel, SectionLabel, TextInput } from "./ui-kit"
+import { Field, MoneyInput, Panel, SectionLabel, TextInput, parseDecimal, toneFromTipo } from "./ui-kit"
 import { cn } from "@/lib/utils"
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -23,6 +23,70 @@ function borderCuenta(tipo: Cuenta["tipo"]) {
   if (tipo === "ahorro") return "border-primary/25 bg-primary/[0.04] text-primary"
   if (tipo === "gastos") return "border-accent/25 bg-accent/[0.04] text-accent"
   return "border-milestone/25 bg-milestone/[0.04] text-milestone"
+}
+
+type ModCuentaMonto = { cuentaId: string; monto: number }
+
+function upsertCuentaMonto(cuentas: ModCuentaMonto[], cuentaId: string, monto: number): ModCuentaMonto[] {
+  const next = [...cuentas]
+  const idx = next.findIndex((x) => x.cuentaId === cuentaId)
+  if (idx >= 0) next[idx] = { ...next[idx], monto }
+  else next.push({ cuentaId, monto })
+  return next
+}
+
+function withResidualRedistribution(
+  mCuentas: ModCuentaMonto[],
+  cuentas: Cuenta[],
+  editedIdx: number,
+  sueldo: number,
+): ModCuentaMonto[] {
+  const lastRefIdx = cuentas.length - 1
+  if (editedIdx === lastRefIdx || lastRefIdx <= 0) return mCuentas
+  const lastId = cuentas[lastRefIdx].id
+  const sumOthers = mCuentas
+    .filter((x) => x.cuentaId !== lastId)
+    .reduce((s, x) => s + (x.monto || 0), 0)
+  return upsertCuentaMonto(mCuentas, lastId, Math.max(sueldo - sumOthers, 0))
+}
+
+async function exportBackup() {
+  try {
+    const raw = localStorage.getItem("novafin-v2")
+    if (!raw) {
+      alert("No hay datos para exportar.")
+      return
+    }
+    const blob = new Blob([raw], { type: "application/json" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `NovaFin-Backup-${new Date().toISOString().split("T")[0]}.json`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  } catch (err) {
+    console.error(err)
+    alert("Error al exportar los datos")
+  }
+}
+
+async function importBackup(file: File) {
+  try {
+    const text = await file.text()
+    const data = JSON.parse(text) as { state?: { config?: unknown } }
+    if (data?.state?.config) {
+      localStorage.setItem("novafin-v2", JSON.stringify(data))
+      alert("Datos restaurados correctamente. El simulador se recargará.")
+      window.location.reload()
+      return
+    }
+    alert("Archivo JSON inválido o corrupto.")
+  } catch (err) {
+    console.error(err)
+    alert("Error procesando el archivo JSON.")
+  }
 }
 
 // ── Profile selector ──────────────────────────────────────────────────────────
@@ -50,10 +114,10 @@ const PERFILES: { id: ModeloCuentas; icon: React.ReactNode; label: string; desc:
 function ProfileSelector({
   current,
   onChange,
-}: {
+}: Readonly<{
   current: ModeloCuentas
   onChange: (m: ModeloCuentas) => void
-}) {
+}>) {
   const handleChange = (m: ModeloCuentas) => {
     if (m === current) return
     const ok = confirm(
@@ -103,11 +167,11 @@ export function ConfigTab({
   config,
   setConfig,
   onReset,
-}: {
+}: Readonly<{
   config: Config
   setConfig: Dispatch<SetStateAction<Config>>
   onReset: () => void
-}) {
+}>) {
   const set = (patch: Partial<Config>) => setConfig((c) => ({ ...c, ...patch }))
 
   // Change account model: rebuild cuentas array from template
@@ -119,12 +183,12 @@ export function ConfigTab({
   // ── Autocomplete deposit for dual mode ──
   // Gastos is always the "last" / residual account
   const handleAhorroBase = (v: string) => {
-    const ahorro = Number(v) || 0
+    const ahorro = parseDecimal(v) || 0
     const gastos = Math.max((Number(config.sueldo) || 0) - ahorro, 0)
     set({ ahorroBase: ahorro, gastoBase: gastos })
   }
   const handleGastoBase = (v: string) => {
-    const gastos = Number(v) || 0
+    const gastos = parseDecimal(v) || 0
     const ahorro = Math.max((Number(config.sueldo) || 0) - gastos, 0)
     set({ gastoBase: gastos, ahorroBase: ahorro })
   }
@@ -133,7 +197,7 @@ export function ConfigTab({
   // The LAST account always gets the remainder
   const handleDepositoCuenta = (idx: number, v: string) => {
     const nuevasCuentas = [...config.cuentas]
-    const monto = Math.max(Number(v) || 0, 0)
+    const monto = Math.max(parseDecimal(v) || 0, 0)
     nuevasCuentas[idx] = { ...nuevasCuentas[idx], depositoFijoMensual: monto }
 
     const lastIdx = nuevasCuentas.length - 1
@@ -188,7 +252,7 @@ export function ConfigTab({
           <SectionLabel>Ingreso mensual</SectionLabel>
         </div>
         <Field label="Sueldo mensual">
-          <MoneyInput value={config.sueldo || ""} onChange={(v) => set({ sueldo: Number(v) })} placeholder="0.00" />
+          <MoneyInput value={config.sueldo || ""} onChange={(v) => set({ sueldo: parseDecimal(v) || 0 })} placeholder="0,00" />
         </Field>
 
         {sueldo > 0 && config.cuentas.length > 1 && (
@@ -218,15 +282,15 @@ export function ConfigTab({
                   tone="ahorro"
                   value={config.ahorroBase || ""}
                   onChange={handleAhorroBase}
-                  placeholder="0.00"
+                  placeholder="0,00"
                 />
               </Field>
               <Field label="Saldo inicial">
                 <MoneyInput
                   tone="ahorro"
                   value={config.ahorroActual || ""}
-                  onChange={(v) => set({ ahorroActual: Number(v) })}
-                  placeholder="0.00"
+                  onChange={(v) => set({ ahorroActual: parseDecimal(v) || 0 })}
+                  placeholder="0,00"
                 />
               </Field>
             </div>
@@ -243,15 +307,15 @@ export function ConfigTab({
                   tone="gastos"
                   value={config.gastoBase || ""}
                   onChange={handleGastoBase}
-                  placeholder="0.00"
+                  placeholder="0,00"
                 />
               </Field>
               <Field label="Sobrante inicial">
                 <MoneyInput
                   tone="gastos"
                   value={config.gastosActual || ""}
-                  onChange={(v) => set({ gastosActual: Number(v) })}
-                  placeholder="0.00"
+                  onChange={(v) => set({ gastosActual: parseDecimal(v) || 0 })}
+                  placeholder="0,00"
                 />
               </Field>
             </div>
@@ -270,15 +334,15 @@ export function ConfigTab({
             <Field label="Saldo actual">
               <MoneyInput
                 value={config.cuentas[0]?.saldoInicial || ""}
-                onChange={(v) => patchCuenta(config.cuentas[0].id, { saldoInicial: Number(v) })}
-                placeholder="0.00"
+                onChange={(v) => patchCuenta(config.cuentas[0].id, { saldoInicial: parseDecimal(v) || 0 })}
+                placeholder="0,00"
               />
             </Field>
             <Field label="Límite de gasto / mes" hint="Lo que sobra de tu sueldo por encima de este límite es tu ahorro virtual.">
               <MoneyInput
                 value={config.cuentas[0]?.limiteGasto || ""}
-                onChange={(v) => patchCuenta(config.cuentas[0].id, { limiteGasto: Number(v) })}
-                placeholder="0.00"
+                onChange={(v) => patchCuenta(config.cuentas[0].id, { limiteGasto: parseDecimal(v) || 0 })}
+                placeholder="0,00"
               />
             </Field>
           </div>
@@ -329,13 +393,13 @@ export function ConfigTab({
                       </button>
                     )}
                   </div>
-                  <div className="grid grid-cols-2 gap-3 mb-3">
+                  <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <Field label="Saldo actual (Opcional)" hint="Dinero que ya tienes ahorrado hoy en esta cuenta.">
                       <MoneyInput
-                        tone={cuenta.tipo === "ahorro" ? "ahorro" : cuenta.tipo === "gastos" ? "gastos" : "neutral"}
+                        tone={toneFromTipo(cuenta.tipo)}
                         value={cuenta.saldoInicial || ""}
-                        onChange={(v) => patchCuenta(cuenta.id, { saldoInicial: Number(v) })}
-                        placeholder="0.00"
+                        onChange={(v) => patchCuenta(cuenta.id, { saldoInicial: parseDecimal(v) || 0 })}
+                        placeholder="0,00"
                       />
                     </Field>
                     <Field
@@ -343,10 +407,10 @@ export function ConfigTab({
                       hint={isLast ? "Se calcula solo con lo sobrante de tu sueldo." : "Parte exacta de tu sueldo que irá aquí."}
                     >
                       <MoneyInput
-                        tone={cuenta.tipo === "ahorro" ? "ahorro" : cuenta.tipo === "gastos" ? "gastos" : "neutral"}
+                        tone={toneFromTipo(cuenta.tipo)}
                         value={cuenta.depositoFijoMensual || ""}
                         onChange={(v) => handleDepositoCuenta(idx, v)}
-                        placeholder={isLast && sueldo > 0 ? `Automático: ${fmt(Math.max(sueldo - config.cuentas.slice(0, idx).reduce((s, c) => s + (Number(c.depositoFijoMensual) || 0), 0), 0))}` : "0.00"}
+                        placeholder={isLast && sueldo > 0 ? `Automático: ${fmt(Math.max(sueldo - config.cuentas.slice(0, idx).reduce((s, c) => s + (Number(c.depositoFijoMensual) || 0), 0), 0))}` : "0,00"}
                       />
                     </Field>
                   </div>
@@ -355,8 +419,8 @@ export function ConfigTab({
                       <Field label="Límite de gasto / mes" hint="El saldo por encima de este límite es ahorro virtual.">
                         <MoneyInput
                           value={cuenta.limiteGasto || ""}
-                          onChange={(v) => patchCuenta(cuenta.id, { limiteGasto: Number(v) })}
-                          placeholder="0.00"
+                          onChange={(v) => patchCuenta(cuenta.id, { limiteGasto: parseDecimal(v) || 0 })}
+                          placeholder="0,00"
                         />
                       </Field>
                     </div>
@@ -390,7 +454,7 @@ export function ConfigTab({
             <TextInput
               type="number"
               value={config.mesesAProyectar}
-              onChange={(v) => set({ mesesAProyectar: Math.max(1, Math.min(120, Number(v) || 1)) })}
+              onChange={(v) => set({ mesesAProyectar: Math.max(1, Math.min(120, parseDecimal(v) || 1)) })}
             />
           </Field>
         </div>
@@ -410,6 +474,7 @@ export function ConfigTab({
           />
           <span className="text-sm text-foreground flex-1">
             Periodos con ingresos / saldos variables
+            {" "}
             <span className="mt-0.5 block text-xs text-muted-foreground leading-relaxed">
               Útil si prevees un cambio temporal o permanente en tus finanzas (ej. de julio a sep ganas distinto, o un ascenso permanente en enero).
             </span>
@@ -444,13 +509,13 @@ export function ConfigTab({
                         value={mod.sueldo || ""}
                         onChange={(v) => {
                           const updated = [...(config.modificadoresBase || [])]
-                          updated[idx] = { ...updated[idx], sueldo: Number(v) }
+                          updated[idx] = { ...updated[idx], sueldo: parseDecimal(v) || 0 }
                           
                           const mCuentas = [...(updated[idx].cuentas || [])]
                           const lastRefIdx = config.cuentas.length - 1
                           if (lastRefIdx > 0) {
                             const sumOthers = mCuentas.filter(x => x.cuentaId !== config.cuentas[lastRefIdx].id).reduce((s, x) => s + (x.monto || 0), 0)
-                            const restante = Math.max((Number(v) || 0) - sumOthers, 0)
+                            const restante = Math.max((parseDecimal(v) || 0) - sumOthers, 0)
                             const exLastIdx = mCuentas.findIndex(x => x.cuentaId === config.cuentas[lastRefIdx].id)
                             if (exLastIdx >= 0) mCuentas[exLastIdx].monto = restante
                             else mCuentas.push({ cuentaId: config.cuentas[lastRefIdx].id, monto: restante })
@@ -500,28 +565,25 @@ export function ConfigTab({
                            </div>
                            <div className="w-2/3">
                              <MoneyInput
-                               tone={cuentaRef.tipo === "ahorro" ? "ahorro" : cuentaRef.tipo === "gastos" ? "gastos" : "neutral"}
+                               tone={toneFromTipo(cuentaRef.tipo)}
                                value={cVal || ""}
                                onChange={(v) => {
                                  const updated = [...(config.modificadoresBase || [])]
-                                 const mCuentas = [...(updated[idx].cuentas || [])]
-                                 const exIdx = mCuentas.findIndex(x => x.cuentaId === cuentaRef.id)
-                                 if (exIdx >= 0) mCuentas[exIdx].monto = Number(v)
-                                 else mCuentas.push({ cuentaId: cuentaRef.id, monto: Number(v) })
-                                 
-                                 const lastRefIdx = config.cuentas.length - 1
-                                 if (cIdx !== lastRefIdx && lastRefIdx > 0) {
-                                   const sumOthers = mCuentas.filter(x => x.cuentaId !== config.cuentas[lastRefIdx].id).reduce((s, x) => s + (x.monto || 0), 0)
-                                   const restante = Math.max((mod.sueldo || 0) - sumOthers, 0)
-                                   const exLastIdx = mCuentas.findIndex(x => x.cuentaId === config.cuentas[lastRefIdx].id)
-                                   if (exLastIdx >= 0) mCuentas[exLastIdx].monto = restante
-                                   else mCuentas.push({ cuentaId: config.cuentas[lastRefIdx].id, monto: restante })
-                                 }
-                                 
-                                 updated[idx].cuentas = mCuentas
+                                 let mCuentas = upsertCuentaMonto(
+                                   [...(updated[idx].cuentas || [])],
+                                   cuentaRef.id,
+                                   parseDecimal(v) || 0,
+                                 )
+                                 mCuentas = withResidualRedistribution(
+                                   mCuentas,
+                                   config.cuentas,
+                                   cIdx,
+                                   mod.sueldo || 0,
+                                 )
+                                 updated[idx] = { ...updated[idx], cuentas: mCuentas }
                                  set({ modificadoresBase: updated })
                                }}
-                               placeholder={isLast && mod.sueldo > 0 ? `Auto residual: ${fmt(Math.max(mod.sueldo - cuentasRestantesExcluyendoUltima, 0))}` : "0.00"}
+                               placeholder={isLast && mod.sueldo > 0 ? `Auto residual: ${fmt(Math.max(mod.sueldo - cuentasRestantesExcluyendoUltima, 0))}` : "0,00"}
                              />
                            </div>
                          </div>
@@ -571,7 +633,10 @@ export function ConfigTab({
           />
           <span className="text-sm text-foreground">
             Descuento temporal del disponible mensual
-            <span className="mt-0.5 block text-xs text-muted-foreground">Por ejemplo, ayuda a un familiar durante algunos meses.</span>
+            {" "}
+            <span className="mt-0.5 block text-xs text-muted-foreground">
+              Por ejemplo, ayuda a un familiar durante algunos meses.
+            </span>
           </span>
         </label>
         {config.descuentoActivo && (
@@ -592,8 +657,8 @@ export function ConfigTab({
               <MoneyInput
                 tone="gastos"
                 value={config.descuentoMonto || ""}
-                onChange={(v) => set({ descuentoMonto: Number(v) })}
-                placeholder="0.00"
+                onChange={(v) => set({ descuentoMonto: parseDecimal(v) || 0 })}
+                placeholder="0,00"
               />
             </Field>
             <Field label="Último mes del descuento">
@@ -612,23 +677,7 @@ export function ConfigTab({
         <div className="flex flex-col sm:flex-row gap-3">
           <button
             type="button"
-            onClick={() => {
-              try {
-                const raw = localStorage.getItem("novafin-v2")
-                if (!raw) return alert("No hay datos para exportar.")
-                const blob = new Blob([raw], { type: "application/json" })
-                const url = URL.createObjectURL(blob)
-                const a = document.createElement("a")
-                a.href = url
-                a.download = `NovaFin-Backup-${new Date().toISOString().split("T")[0]}.json`
-                document.body.appendChild(a)
-                a.click()
-                document.body.removeChild(a)
-                URL.revokeObjectURL(url)
-              } catch(e) {
-                alert("Error al exportar los datos")
-              }
-            }}
+            onClick={() => void exportBackup()}
             className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-secondary/20 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary/40"
           >
             <DownloadCloud className="size-4 text-primary" />
@@ -645,24 +694,8 @@ export function ConfigTab({
               onChange={(e) => {
                 const file = e.target.files?.[0]
                 if (!file) return
-                const reader = new FileReader()
-                reader.onload = (ev) => {
-                  try {
-                    const text = ev.target?.result as string
-                    const data = JSON.parse(text)
-                    if (data && data.state && data.state.config) {
-                      localStorage.setItem("novafin-v2", JSON.stringify(data))
-                      alert("Datos restaurados correctamente. El simulador se recargará.")
-                      window.location.reload()
-                    } else {
-                      alert("Archivo JSON inválido o corrupto.")
-                    }
-                  } catch (err) {
-                    alert("Error procesando el archivo JSON.")
-                  }
-                }
-                reader.readAsText(file)
-                e.target.value = "" // reset input
+                void importBackup(file)
+                e.target.value = ""
               }}
             />
           </label>
