@@ -162,6 +162,14 @@ export function fmt(n: number) {
     maximumFractionDigits: 2,
   })
 }
+
+/** Parse money/decimal strings that may use comma or period. */
+export function parseDecimal(v: string | number | null | undefined): number {
+  if (typeof v === "number") return Number.isFinite(v) ? v : NaN
+  if (v == null || String(v).trim() === "") return NaN
+  const n = Number(String(v).trim().replaceAll(",", "."))
+  return Number.isFinite(n) ? n : NaN
+}
 export function uid() {
   return Math.random().toString(36).slice(2, 10)
 }
@@ -330,11 +338,11 @@ export function generarProyeccion(
       let tieneReal = false
       if (config.modeloCuentas === "dual") {
         if (cid === "ahorro" && saldosRealesAhorro[mesKey] !== undefined && saldosRealesAhorro[mesKey] !== "") {
-          realOverride = Number(saldosRealesAhorro[mesKey]) || 0
+          realOverride = parseDecimal(saldosRealesAhorro[mesKey]) || 0
           tieneReal = true
         }
         if (cid === "gastos" && saldosRealesGastos[mesKey] !== undefined && saldosRealesGastos[mesKey] !== "") {
-          realOverride = Number(saldosRealesGastos[mesKey]) || 0
+          realOverride = parseDecimal(saldosRealesGastos[mesKey]) || 0
           tieneReal = true
         }
       }
