@@ -138,7 +138,7 @@ export function ResumenTab({
 
       {/* Ledger table */}
       <div className="overflow-x-auto rounded-xl border border-border">
-        <table className="w-full text-sm tnum">
+        <table className="w-full text-sm tnum min-w-[900px]">
           <thead>
             <tr className="border-b border-border text-left text-[11px] text-muted-foreground">
               <th className="px-3 py-2.5 font-medium">Mes</th>
