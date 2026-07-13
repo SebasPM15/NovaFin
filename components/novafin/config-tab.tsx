@@ -1,6 +1,6 @@
 "use client"
 
-import type { Dispatch, SetStateAction } from "react"
+import { useRef, type Dispatch, type SetStateAction } from "react"
 import {
   Banknote, CalendarRange, Check, PiggyBank, Plus, RotateCcw,
   Settings2, Trash2, User, Wallet, DownloadCloud, UploadCloud
@@ -50,11 +50,11 @@ function withResidualRedistribution(
   return upsertCuentaMonto(mCuentas, lastId, Math.max(sueldo - sumOthers, 0))
 }
 
-async function exportBackup() {
+function exportBackup() {
   try {
     const raw = localStorage.getItem("novafin-v2")
     if (!raw) {
-      alert("No hay datos para exportar.")
+      window.alert("No hay datos para exportar.")
       return
     }
     const blob = new Blob([raw], { type: "application/json" })
@@ -64,11 +64,13 @@ async function exportBackup() {
     a.download = `NovaFin-Backup-${new Date().toISOString().split("T")[0]}.json`
     document.body.appendChild(a)
     a.click()
-    a.remove()
-    URL.revokeObjectURL(url)
+    setTimeout(() => {
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+    }, 100)
   } catch (err) {
     console.error(err)
-    alert("Error al exportar los datos")
+    window.alert("Error al exportar los datos")
   }
 }
 
@@ -78,14 +80,14 @@ async function importBackup(file: File) {
     const data = JSON.parse(text) as { state?: { config?: unknown } }
     if (data?.state?.config) {
       localStorage.setItem("novafin-v2", JSON.stringify(data))
-      alert("Datos restaurados correctamente. El simulador se recargará.")
+      window.alert("Datos restaurados correctamente. El simulador se recargará.")
       window.location.reload()
       return
     }
-    alert("Archivo JSON inválido o corrupto.")
+    window.alert("Archivo JSON inválido o corrupto.")
   } catch (err) {
     console.error(err)
-    alert("Error procesando el archivo JSON.")
+    window.alert("Error procesando el archivo JSON.")
   }
 }
 
@@ -120,7 +122,7 @@ function ProfileSelector({
 }>) {
   const handleChange = (m: ModeloCuentas) => {
     if (m === current) return
-    const ok = confirm(
+    const ok = window.confirm(
       `Cambiar a "${PERFILES.find((p) => p.id === m)?.label}" creará cuentas nuevas por defecto. ¿Continuar?`,
     )
     if (ok) onChange(m)
@@ -172,6 +174,7 @@ export function ConfigTab({
   setConfig: Dispatch<SetStateAction<Config>>
   onReset: () => void
 }>) {
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const set = (patch: Partial<Config>) => setConfig((c) => ({ ...c, ...patch }))
 
   // Change account model: rebuild cuentas array from template
@@ -677,28 +680,33 @@ export function ConfigTab({
         <div className="flex flex-col sm:flex-row gap-3">
           <button
             type="button"
-            onClick={() => void exportBackup()}
-            className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-secondary/20 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary/40"
+            onClick={() => exportBackup()}
+            className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-secondary/20 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary/40 cursor-pointer"
           >
             <DownloadCloud className="size-4 text-primary" />
             Descargar Respaldo
           </button>
           
-          <label className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-secondary/20 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary/40 cursor-pointer">
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-secondary/20 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary/40 cursor-pointer"
+          >
             <UploadCloud className="size-4 text-accent" />
             Importar Archivo
-            <input 
-              type="file" 
-              accept=".json" 
-              className="hidden" 
-              onChange={(e) => {
-                const file = e.target.files?.[0]
-                if (!file) return
-                void importBackup(file)
-                e.target.value = ""
-              }}
-            />
-          </label>
+          </button>
+          <input 
+            ref={fileInputRef}
+            type="file" 
+            accept=".json" 
+            style={{ display: "none" }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (!file) return
+              void importBackup(file)
+              e.target.value = ""
+            }}
+          />
         </div>
       </Panel>
 
@@ -711,9 +719,9 @@ export function ConfigTab({
         <button
           type="button"
           onClick={() => {
-            if (confirm("¿Seguro que quieres borrar todos tus datos? Esta acción no se puede deshacer.")) onReset()
+            if (window.confirm("¿Seguro que quieres borrar todos tus datos? Esta acción no se puede deshacer.")) onReset()
           }}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/40 px-3 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/40 px-3 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 cursor-pointer"
         >
           <RotateCcw className="size-4" />
           Reiniciar
