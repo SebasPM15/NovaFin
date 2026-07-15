@@ -57,11 +57,11 @@ export function CalculatorWidget() {
   }
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
+    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3 pointer-events-none">
       <div
         className={cn(
           "w-64 origin-bottom-right transform rounded-2xl border border-border bg-background p-4 shadow-2xl transition-all duration-300",
-          open ? "scale-100 opacity-100" : "pointer-events-none scale-90 opacity-0",
+          open ? "pointer-events-auto scale-100 opacity-100" : "pointer-events-none scale-90 opacity-0",
         )}
       >
         <div className="mb-3 flex items-center justify-between">
@@ -133,7 +133,7 @@ export function CalculatorWidget() {
         type="button"
         onClick={() => setOpen(!open)}
         className={cn(
-          "flex size-14 items-center justify-center rounded-full text-white shadow-xl transition-all hover:scale-105 active:scale-95",
+          "pointer-events-auto flex size-14 items-center justify-center rounded-full text-white shadow-xl transition-all hover:scale-105 active:scale-95",
           open ? "bg-muted-foreground" : "bg-primary",
         )}
       >

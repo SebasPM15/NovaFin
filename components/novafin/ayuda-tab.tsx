@@ -106,6 +106,35 @@ export function AyudaTab() {
       </div>
 
       <h3 className="font-display text-lg font-bold text-foreground px-1 mt-10 mb-2 flex items-center gap-2">
+        <Lightbulb className="size-5 text-muted-foreground" />
+        Beneficios de Ley (Ecuador)
+      </h3>
+      <div className="space-y-3">
+        <FaqItem title="¿Cómo funciona el descuento del IESS?">
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Al activar el switch de <strong>Aporte al IESS (9.45%)</strong> en Configuración, debes ingresar tu <strong>Sueldo Bruto</strong> (lo que dice tu contrato). El simulador restará automáticamente el porcentaje de ley y utilizará tu <strong>Neto Efectivo</strong> para todas las proyecciones de ahorro y gastos, simulando exactamente la liquidez que llegará a tu banco.
+          </p>
+        </FaqItem>
+        <FaqItem title="Décimos y Fondos de Reserva: Proyección automática">
+          <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+            NovaFin inyecta automáticamente ingresos en tu tabla según la ley laboral:
+          </p>
+          <ul className="space-y-2 text-sm text-muted-foreground ml-4 list-disc marker:text-primary/50">
+            <li><strong>Décimo Tercero (D13):</strong> Se calcula en diciembre (o acumulado mensual).</li>
+            <li><strong>Décimo Cuarto (D14):</strong> Equivale a 1 SBU en Agosto (Sierra) o Abril. Si llevas menos de 1 año trabajando, NovaFin calculará matemáticamente la contribución <em>proporcional exacta</em>.</li>
+            <li><strong>Fondos de Reserva:</strong> Empiezan a calcularse mes a mes (8.33% del bruto) <strong>estrictamente a partir de tu mes 13ero de empleo</strong>.</li>
+          </ul>
+        </FaqItem>
+        <FaqItem title="Distribución independiente en cada meta">
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Podrías ahorrar el 100% de tus décimos de agosto para matrículas (Ahorro), pero gastar la mitad de los décimos de diciembre en regalos (Gastos).
+            <br /><br />
+            NovaFin cuenta con distribuciones <strong>totalmente independientes</strong> calculadas en porcentajes (%). Así, los montos de la tabla se adaptarán a la perfección. 
+          </p>
+        </FaqItem>
+      </div>
+
+      <h3 className="font-display text-lg font-bold text-foreground px-1 mt-10 mb-2 flex items-center gap-2">
         <Target className="size-5 text-muted-foreground" />
         Metas y Proyección (Tabla Resumen)
       </h3>
