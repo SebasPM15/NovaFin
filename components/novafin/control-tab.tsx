@@ -170,7 +170,21 @@ function IngresosPanel({
                   tone={toneFromTipo(c.tipo)}
                   className="w-full sm:flex-1"
                   value={distribucion[c.id] ?? ""}
-                  onChange={(v) => setDistribucion((prev: Record<string, string>) => ({ ...prev, [c.id]: v }))}
+                  onChange={(v) => {
+                    const idx = cuentas.findIndex((x) => x.id === c.id)
+                    const lastIdx = cuentas.length - 1
+                    setDistribucion((prev: Record<string, string>) => {
+                      const next = { ...prev, [c.id]: v }
+                      if (idx !== lastIdx && lastIdx >= 0) {
+                        const sumOthers = cuentas
+                          .slice(0, lastIdx)
+                          .reduce((s, x) => s + (parseDecimal(next[x.id]) || 0), 0)
+                        const restante = Math.max(total - sumOthers, 0)
+                        next[cuentas[lastIdx].id] = restante > 0 ? String(restante) : ""
+                      }
+                      return next
+                    })
+                  }}
                   placeholder="0,00"
                   onEnter={agregar}
                 />

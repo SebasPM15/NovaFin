@@ -161,8 +161,13 @@ export function ResumenTab({
                 config.fechaNacimiento.length >= 7 &&
                 f.mes.substring(5, 7) === config.fechaNacimiento.substring(5, 7)
                 
-              const ingresosAhorro = f.saldosPorCuenta.filter(s => s.ingresoDelMes > 0 && config.cuentas.find(c => c.id === s.cuentaId)?.tipo === "ahorro")
-              const ingresosGastos = f.saldosPorCuenta.filter(s => s.ingresoDelMes > 0 && ["gastos", "general"].includes(config.cuentas.find(c => c.id === s.cuentaId)?.tipo || ""))
+              const ss = f.sobresueldosDelMes || { decimoTercero: 0, decimoCuarto: 0, fondosReserva: 0 }
+              const tieneSobresueldos = ss.decimoTercero > 0 || ss.decimoCuarto > 0 || ss.fondosReserva > 0
+
+              const ingresosAhorro = f.saldosPorCuenta.filter(s => (s.ingresoDelMes > 0 || s.sobresueldoDelMes > 0) && config.cuentas.find(c => c.id === s.cuentaId)?.tipo === "ahorro")
+              const ingresosGastos = f.saldosPorCuenta.filter(s => (s.ingresoDelMes > 0 || s.sobresueldoDelMes > 0) && ["gastos", "general"].includes(config.cuentas.find(c => c.id === s.cuentaId)?.tipo || ""))
+
+              const totalIngresos = (f.ingresosDelMes || 0) + ss.decimoTercero + ss.decimoCuarto + ss.fondosReserva
 
               return (
                 <tr
@@ -186,7 +191,7 @@ export function ResumenTab({
                         </span>
                       )}
                     </div>
-                    {(esCumple || alcances.length > 0 || compras.length > 0) && (
+                    {(esCumple || alcances.length > 0 || compras.length > 0 || tieneSobresueldos) && (
                       <div className="mt-1.5 flex flex-col gap-1">
                         {esCumple && (
                           <Tag tone="milestone" icon={<Cake className="size-3" />}>
@@ -203,6 +208,21 @@ export function ResumenTab({
                             Alcanzable: {m.nombre}
                           </Tag>
                         ))}
+                        {ss.decimoTercero > 0 && (
+                          <Tag tone="milestone" icon={<Banknote className="size-3" />}>
+                            D13 (+${fmt(ss.decimoTercero)})
+                          </Tag>
+                        )}
+                        {ss.decimoCuarto > 0 && (
+                          <Tag tone="milestone" icon={<Banknote className="size-3" />}>
+                            D14 (+${fmt(ss.decimoCuarto)})
+                          </Tag>
+                        )}
+                        {ss.fondosReserva > 0 && (
+                          <Tag tone="milestone" icon={<Banknote className="size-3" />}>
+                            FR (+${fmt(ss.fondosReserva)})
+                          </Tag>
+                        )}
                       </div>
                     )}
                   </td>
@@ -216,7 +236,7 @@ export function ResumenTab({
                     {f.ajustesDelMes !== 0 ? fmt(f.ajustesDelMes) : "—"}
                   </td>
                   <td className="px-3 py-2 text-right align-top text-milestone/90 font-medium">
-                    {f.ingresosDelMes ? `+${fmt(f.ingresosDelMes)}` : "—"}
+                    {totalIngresos > 0 ? `+${fmt(totalIngresos)}` : "—"}
                   </td>
                   <td className="px-3 py-2 text-right align-top text-muted-foreground">
                     {f.comprasDelMes ? `-${fmt(f.comprasDelMes)}` : "—"}
@@ -225,9 +245,32 @@ export function ResumenTab({
                     <div>{fmt(f.ahorroAcumulado)}</div>
                     {ingresosAhorro.length > 0 && config.cuentas.length > 1 && (
                       <div className="mt-1 flex flex-col items-end gap-0.5 text-[9px] font-normal leading-[1.1] text-primary/70">
-                        {ingresosAhorro.map(s => (
-                           <span key={s.cuentaId}>Extra {config.cuentas.find(x => x.id === s.cuentaId)?.nombre}: +{fmt(s.ingresoDelMes)}</span>
-                        ))}
+                        {ingresosAhorro.map(s => {
+                           const c = config.cuentas.find(x => x.id === s.cuentaId)
+                           const onlyOne = config.cuentas.filter(x => x.tipo === "ahorro").length === 1
+                           const els = []
+                           
+                           if (s.ingresoDelMes > 0) {
+                             els.push(
+                               <span key={`${s.cuentaId}-man`}>
+                                 +{fmt(s.ingresoDelMes)} {onlyOne ? "(Ingreso extra)" : `en ${c?.nombre}`}
+                               </span>
+                             )
+                           }
+                           
+                           if (s.sobresueldoDelMes > 0) {
+                             const ss = f.sobresueldosDelMes || { decimoTercero: 0, decimoCuarto: 0, fondosReserva: 0 }
+                             const totalSs = ss.decimoTercero + ss.decimoCuarto + ss.fondosReserva
+                             const pct = totalSs > 0 ? Math.round((s.sobresueldoDelMes / totalSs) * 100) : 0
+                             els.push(
+                               <span key={`${s.cuentaId}-sob`}>
+                                 {pct}% = +{fmt(s.sobresueldoDelMes)} {onlyOne ? "" : `(${c?.nombre})`}
+                               </span>
+                             )
+                           }
+                           
+                           return els
+                        })}
                       </div>
                     )}
                   </td>
@@ -239,9 +282,32 @@ export function ResumenTab({
                     <div>{fmt(f.gastosAcumulado)}</div>
                     {ingresosGastos.length > 0 && config.cuentas.length > 1 && (
                       <div className="mt-1 flex flex-col items-end gap-0.5 text-[9px] font-normal leading-[1.1] text-accent/70">
-                        {ingresosGastos.map(s => (
-                           <span key={s.cuentaId}>Extra {config.cuentas.find(x => x.id === s.cuentaId)?.nombre}: +{fmt(s.ingresoDelMes)}</span>
-                        ))}
+                        {ingresosGastos.map(s => {
+                           const c = config.cuentas.find(x => x.id === s.cuentaId)
+                           const onlyOne = config.cuentas.filter(x => ["gastos", "general"].includes(x.tipo)).length === 1
+                           const els = []
+                           
+                           if (s.ingresoDelMes > 0) {
+                             els.push(
+                               <span key={`${s.cuentaId}-man`}>
+                                 +{fmt(s.ingresoDelMes)} {onlyOne ? "(Ingreso extra)" : `en ${c?.nombre}`}
+                               </span>
+                             )
+                           }
+                           
+                           if (s.sobresueldoDelMes > 0) {
+                             const ss = f.sobresueldosDelMes || { decimoTercero: 0, decimoCuarto: 0, fondosReserva: 0 }
+                             const totalSs = ss.decimoTercero + ss.decimoCuarto + ss.fondosReserva
+                             const pct = totalSs > 0 ? Math.round((s.sobresueldoDelMes / totalSs) * 100) : 0
+                             els.push(
+                               <span key={`${s.cuentaId}-sob`}>
+                                 {pct}% = +{fmt(s.sobresueldoDelMes)} {onlyOne ? "" : `(${c?.nombre})`}
+                               </span>
+                             )
+                           }
+                           
+                           return els
+                        })}
                       </div>
                     )}
                   </td>

@@ -7,7 +7,7 @@ import {
 } from "lucide-react"
 import {
   type Config, type Cuenta, type ModeloCuentas, type ModificadorBase,
-  fmt, uid, defaultCuentasForModelo,
+  fmt, uid, defaultCuentasForModelo, DEFAULT_SOBRESUELDOS,
 } from "@/lib/finance"
 import { Field, MoneyInput, Panel, SectionLabel, TextInput, parseDecimal, toneFromTipo } from "./ui-kit"
 import { cn } from "@/lib/utils"
@@ -194,16 +194,20 @@ export function ConfigTab({
     set({ modeloCuentas: m, cuentas })
   }
 
+  const sueldoBruto = Number(config.sueldo) || 0
+  const sueldoActivoIESS = config.aportaIESS
+  const sueldoEfectivo = sueldoActivoIESS ? Math.round(sueldoBruto * 0.9055 * 100) / 100 : sueldoBruto
+
   // ── Autocomplete deposit for dual mode ──
   // Gastos is always the "last" / residual account
   const handleAhorroBase = (v: string) => {
     const ahorro = parseDecimal(v) || 0
-    const gastos = Math.max((Number(config.sueldo) || 0) - ahorro, 0)
+    const gastos = Math.max(sueldoEfectivo - ahorro, 0)
     set({ ahorroBase: ahorro, gastoBase: gastos })
   }
   const handleGastoBase = (v: string) => {
     const gastos = parseDecimal(v) || 0
-    const ahorro = Math.max((Number(config.sueldo) || 0) - gastos, 0)
+    const ahorro = Math.max(sueldoEfectivo - gastos, 0)
     set({ gastoBase: gastos, ahorroBase: ahorro })
   }
 
@@ -220,7 +224,7 @@ export function ConfigTab({
       const sumOthers = nuevasCuentas
         .slice(0, lastIdx)
         .reduce((s, c) => s + (Number(c.depositoFijoMensual) || 0), 0)
-      const restante = Math.max((Number(config.sueldo) || 0) - sumOthers, 0)
+      const restante = Math.max(sueldoEfectivo - sumOthers, 0)
       nuevasCuentas[lastIdx] = { ...nuevasCuentas[lastIdx], depositoFijoMensual: restante }
     }
 
@@ -242,9 +246,9 @@ export function ConfigTab({
   const reparto = config.modeloCuentas === "dual"
     ? (Number(config.ahorroBase) || 0) + (Number(config.gastoBase) || 0)
     : config.cuentas.reduce((s, c) => s + (Number(c.depositoFijoMensual) || 0), 0)
-  const sueldo = Number(config.sueldo) || 0
-  const libre = Math.max(sueldo - reparto, 0)
-  const excede = sueldo > 0 && reparto > sueldo + 0.001
+  
+  const libre = Math.max(sueldoEfectivo - reparto, 0)
+  const excede = sueldoEfectivo > 0 && reparto > sueldoEfectivo + 0.001
 
   const lastIdx = config.cuentas.length - 1
 
@@ -265,11 +269,33 @@ export function ConfigTab({
           <User className="size-4 text-muted-foreground" />
           <SectionLabel>Ingreso mensual</SectionLabel>
         </div>
-        <Field label="Sueldo mensual">
+
+        <label className="mb-4 flex cursor-pointer items-start gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-secondary/20">
+          <input
+            type="checkbox"
+            checked={sueldoActivoIESS}
+            onChange={(e) => set({ aportaIESS: e.target.checked })}
+            className="mt-0.5 size-4 rounded accent-primary cursor-pointer"
+          />
+          <div className="flex flex-col">
+            <span className="text-[13px] font-medium text-foreground">Aporto al IESS (9.45%)</span>
+            <span className="text-[11px] text-muted-foreground/80 mt-0.5 leading-relaxed">
+              Ingresa el sueldo bruto y NovaFin calculará automáticamente tu sueldo neto para la distribución.
+            </span>
+          </div>
+        </label>
+
+        <Field label={sueldoActivoIESS ? "Sueldo bruto mensual" : "Sueldo mensual"}>
           <MoneyInput value={config.sueldo || ""} onChange={(v) => set({ sueldo: parseDecimal(v) || 0 })} placeholder="0,00" />
         </Field>
 
-        {sueldo > 0 && config.cuentas.length > 1 && (
+        {sueldoActivoIESS && sueldoBruto > 0 && (
+          <div className="mt-2 text-[11px] font-medium text-primary bg-primary/10 px-3 py-2 rounded-lg border border-primary/20 flex items-center gap-2">
+            <span className="opacity-70 line-through">${fmt(sueldoBruto)}</span> → Neto efectivo: <strong>${fmt(sueldoEfectivo)}</strong>
+          </div>
+        )}
+
+        {sueldoEfectivo > 0 && config.cuentas.length > 1 && (
           <div className={cn(
             "mt-3 flex items-center justify-between rounded-lg border px-3 py-2 text-[12px]",
             excede
@@ -291,7 +317,7 @@ export function ConfigTab({
               <SectionLabel tone="ahorro">Cuenta Ahorro</SectionLabel>
             </div>
             <div className="space-y-4">
-              <Field label="Depósito fijo mensual" hint={sueldo > 0 ? "El resto va automáticamente a Gastos." : undefined}>
+              <Field label="Depósito fijo mensual" hint={sueldoEfectivo > 0 ? "El resto va automáticamente a Gastos." : undefined}>
                 <MoneyInput
                   tone="ahorro"
                   value={config.ahorroBase || ""}
@@ -316,7 +342,7 @@ export function ConfigTab({
               <SectionLabel tone="gastos">Cuenta Gastos</SectionLabel>
             </div>
             <div className="space-y-4">
-              <Field label="Disponible mensual base" hint={sueldo > 0 ? "Cambia el de Ahorro para ajustar automáticamente." : undefined}>
+              <Field label="Disponible mensual base" hint={sueldoEfectivo > 0 ? "Cambia el de Ahorro para ajustar automáticamente." : undefined}>
                 <MoneyInput
                   tone="gastos"
                   value={config.gastoBase || ""}
@@ -370,7 +396,7 @@ export function ConfigTab({
             <Settings2 className="size-4 text-muted-foreground" />
             <SectionLabel>Mis cuentas</SectionLabel>
           </div>
-          {sueldo > 0 && config.cuentas.length > 1 && (
+          {sueldoEfectivo > 0 && config.cuentas.length > 1 && (
             <p className="mb-3 text-[11px] text-muted-foreground">
               💡 La <strong className="text-foreground">última cuenta</strong> se autocompletará con el saldo restante del sueldo.
             </p>
@@ -424,7 +450,7 @@ export function ConfigTab({
                         tone={toneFromTipo(cuenta.tipo)}
                         value={cuenta.depositoFijoMensual || ""}
                         onChange={(v) => handleDepositoCuenta(idx, v)}
-                        placeholder={isLast && sueldo > 0 ? `Automático: ${fmt(Math.max(sueldo - config.cuentas.slice(0, idx).reduce((s, c) => s + (Number(c.depositoFijoMensual) || 0), 0), 0))}` : "0,00"}
+                        placeholder={isLast && sueldoEfectivo > 0 ? `Automático: ${fmt(Math.max(sueldoEfectivo - config.cuentas.slice(0, idx).reduce((s, c) => s + (Number(c.depositoFijoMensual) || 0), 0), 0))}` : "0,00"}
                       />
                     </Field>
                   </div>
@@ -453,6 +479,137 @@ export function ConfigTab({
           </div>
         </Panel>
       )}
+
+      {/* ── Sobresueldos (Décimos y Fondos de Reserva) ── */}
+      <Panel>
+        <div className="mb-4 flex items-center gap-2">
+          <Banknote className="size-4 text-muted-foreground" />
+          <SectionLabel>Beneficios de Ley y Sobresueldos</SectionLabel>
+        </div>
+
+        <label className="mb-4 flex cursor-pointer items-start gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-secondary/20">
+          <input
+            type="checkbox"
+            checked={!!config.sobresueldos?.activo}
+            onChange={(e) => {
+              const prev = config.sobresueldos || DEFAULT_SOBRESUELDOS
+              set({ sobresueldos: { ...prev, activo: e.target.checked } })
+            }}
+            className="mt-0.5 size-4 rounded accent-primary cursor-pointer"
+          />
+          <div className="flex flex-col">
+            <span className="text-[13px] font-medium text-foreground">Incluir Décimos y Fondos de Reserva en la proyección</span>
+            <span className="text-[11px] text-muted-foreground/80 mt-0.5 leading-relaxed">
+              Exclusivo si estás afiliado en relación de dependencia. El motor calculará los proporcionales automáticamente con confirmación previa.
+            </span>
+          </div>
+        </label>
+
+        {config.sobresueldos?.activo && (
+          <div className="mt-5 border-t border-border/60 pt-5 space-y-6">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Field label="Fecha de ingreso al trabajo" hint="Obligatorio para cálculo proporcional y 1er año de FR">
+                <TextInput
+                  type="date"
+                  value={config.sobresueldos.fechaIngresoTrabajo}
+                  onChange={(v) => set({ sobresueldos: { ...config.sobresueldos!, fechaIngresoTrabajo: v } })}
+                />
+              </Field>
+              <Field label="Salario Básico Unificado (SBU)" hint="Valor para el cálculo del Décimo Cuarto ($482 actual)">
+                <TextInput
+                  type="number"
+                  value={String(config.sobresueldos.sbu)}
+                  onChange={(v) => set({ sobresueldos: { ...config.sobresueldos!, sbu: parseDecimal(v) || 0 } })}
+                />
+              </Field>
+            </div>
+            
+            {/* Modalidades */}
+            <div className="grid grid-cols-1 gap-5 rounded-lg border border-primary/10 bg-primary/[0.02] p-4 sm:grid-cols-2">
+              <Field label="Décimo Tercero (Navideño)">
+                <select
+                  value={config.sobresueldos.modalidadDecimoTercero}
+                  onChange={(e) => set({ sobresueldos: { ...config.sobresueldos!, modalidadDecimoTercero: e.target.value as any } })}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring"
+                >
+                  <option value="diciembre">Se acumula para Diciembre</option>
+                  <option value="acumulado">Recibo mensualizado</option>
+                </select>
+              </Field>
+              <Field label="Décimo Cuarto (Escolar)">
+                <select
+                  value={config.sobresueldos.modalidadDecimoCuarto}
+                  onChange={(e) => set({ sobresueldos: { ...config.sobresueldos!, modalidadDecimoCuarto: e.target.value as any } })}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring"
+                >
+                  <option value="agosto">Agosto (Sierra / Amazonía)</option>
+                  <option value="abril">Abril (Costa / Galápagos)</option>
+                  <option value="acumulado">Recibo mensualizado</option>
+                </select>
+              </Field>
+            </div>
+
+            <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-secondary/20">
+              <input
+                type="checkbox"
+                checked={config.sobresueldos.recibirFondosReserva}
+                onChange={(e) => set({ sobresueldos: { ...config.sobresueldos!, recibirFondosReserva: e.target.checked } })}
+                className="mt-0.5 size-4 rounded accent-primary cursor-pointer"
+              />
+              <div className="flex flex-col">
+                <span className="text-[13px] font-medium text-foreground">Retiro Fondos de Reserva (Mensualizado)</span>
+                <span className="text-[11px] text-muted-foreground/80 mt-0.5 leading-relaxed">
+                  Aplica a partir del mes consecutivo al de haber cumplido tu primer año. Es el 8.33% de tu bruto.
+                </span>
+              </div>
+            </label>
+
+            {config.cuentas.length > 1 && (
+              <div className="rounded-lg border border-border bg-secondary/10 p-4">
+                <div className="mb-4">
+                  <div className="text-[12px] font-semibold text-foreground uppercase tracking-wider">Distribución a cuentas (Porcentajes)</div>
+                  <div className="text-[10px] text-muted-foreground mt-0.5">La última cuenta se rellena automáticamente (100% - resto).</div>
+                </div>
+                <div className="space-y-6">
+                  <DistribucionSobresueldo
+                    label="Décimo Tercero"
+                    distribucion={config.sobresueldos.distribucionDecimoTercero}
+                    onChange={(d) => set({ sobresueldos: { ...config.sobresueldos!, distribucionDecimoTercero: d }})}
+                    cuentas={config.cuentas}
+                  />
+                  <DistribucionSobresueldo
+                    label="Décimo Cuarto"
+                    distribucion={config.sobresueldos.distribucionDecimoCuarto}
+                    onChange={(d) => set({ sobresueldos: { ...config.sobresueldos!, distribucionDecimoCuarto: d }})}
+                    cuentas={config.cuentas}
+                  />
+                  {config.sobresueldos.recibirFondosReserva && (
+                    <DistribucionSobresueldo
+                      label="Fondos de Reserva"
+                      distribucion={config.sobresueldos.distribucionFondosReserva}
+                      onChange={(d) => set({ sobresueldos: { ...config.sobresueldos!, distribucionFondosReserva: d }})}
+                      cuentas={config.cuentas}
+                    />
+                  )}
+                </div>
+              </div>
+            )}
+            
+            <label className="flex cursor-pointer items-start gap-4 rounded-xl border border-primary/40 bg-primary/[0.04] p-4 transition-colors hover:bg-primary/10">
+              <input
+                type="checkbox"
+                checked={config.sobresueldos.confirmado}
+                onChange={(e) => set({ sobresueldos: { ...config.sobresueldos!, confirmado: e.target.checked } })}
+                className="mt-0.5 size-5 rounded accent-primary cursor-pointer border-primary/50"
+              />
+              <div className="flex flex-col">
+                <span className="text-[14px] font-bold text-primary">Confirmo que quiero agregar estos ingresos a la proyección</span>
+                <span className="text-[11px] text-primary/80 mt-1 leading-relaxed font-medium">Solo cuando marcas esta casilla, NovaFin empezará a sumar automáticamente los montos a tus cuentas en los meses correspondientes.</span>
+              </div>
+            </label>
+          </div>
+        )}
+      </Panel>
 
       {/* ── Horizonte ── */}
       <Panel>
@@ -737,6 +894,76 @@ export function ConfigTab({
           <RotateCcw className="size-4" />
           Reiniciar
         </button>
+      </div>
+    </div>
+  )
+}
+
+function DistribucionSobresueldo({
+  label,
+  distribucion,
+  onChange,
+  cuentas,
+}: Readonly<{
+  label: string
+  distribucion: { cuentaId: string; monto: number }[]
+  onChange: (d: { cuentaId: string; monto: number }[]) => void
+  cuentas: Cuenta[]
+}>) {
+  if (cuentas.length <= 1) return null
+  const lastIdx = cuentas.length - 1
+  const dist = distribucion || []
+
+  return (
+    <div className="space-y-2.5">
+      <div className="text-[11px] font-medium text-primary uppercase tracking-wider">{label}</div>
+      <div className="space-y-2 border-l-2 border-primary/20 pl-3">
+        {cuentas.map((c, i) => {
+          const isLast = i === lastIdx
+          const val = isLast
+            ? Math.max(100 - cuentas.slice(0, lastIdx).reduce((s, acc) => s + (dist.find(d => d.cuentaId === acc.id)?.monto ?? (cuentas.findIndex(x=>x.id===acc.id)===0?100:0)), 0), 0)
+            : dist.find(d => d.cuentaId === c.id)?.monto ?? (i === 0 ? 100 : 0)
+            
+          return (
+            <div key={c.id} className="flex items-center gap-3">
+              <span className="flex-1 truncate text-[12px] text-foreground font-medium">{c.nombre}</span>
+              <div className="relative flex items-center">
+                <input
+                  type="number" min="0" max="100"
+                  value={val}
+                  disabled={isLast}
+                  readOnly={isLast}
+                  onChange={(e) => {
+                    const raw = Math.min(100, Math.max(0, parseDecimal(e.target.value) || 0))
+                    let mdist = [...dist]
+                    // Clean up 0 defaults logic implicitly
+                    for (const acc of cuentas) {
+                      if (!mdist.find(x => x.cuentaId === acc.id)) {
+                         mdist.push({ cuentaId: acc.id, monto: cuentas.findIndex(x=>x.id===acc.id)===0?100:0 })
+                      }
+                    }
+                    
+                    const cIdx = mdist.findIndex(x => x.cuentaId === c.id)
+                    if (cIdx >= 0) mdist[cIdx].monto = raw
+                    
+                    const currentSumOthers = cuentas.slice(0, lastIdx).reduce((s, acc) => s + (mdist.find(d => d.cuentaId === acc.id)?.monto ?? 0), 0)
+                    const residual = Math.max(100 - currentSumOthers, 0)
+                    const lastCid = cuentas[lastIdx].id
+                    const lastDistIdx = mdist.findIndex(x => x.cuentaId === lastCid)
+                    if (lastDistIdx >= 0) mdist[lastDistIdx].monto = residual
+                    
+                    onChange(mdist)
+                  }}
+                  className={cn(
+                    "w-24 rounded-md border border-input pl-3 pr-8 py-1.5 text-sm outline-none focus:border-ring transition-colors",
+                    isLast ? "bg-secondary/40 text-muted-foreground border-transparent shadow-none" : "bg-background"
+                  )}
+                />
+                <span className={cn("absolute right-3 text-[11px] font-medium select-none cursor-default", isLast ? "text-muted-foreground/30" : "text-muted-foreground/60")}>%</span>
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
