@@ -70,7 +70,7 @@ export function Field({
   className?: string
 }>) {
   return (
-    <label className={cn("block", className)}>
+    <label className={cn("block min-w-0", className)}>
       <span className="mb-1.5 block text-xs font-medium text-muted-foreground">{label}</span>
       {children}
       {hint ? <span className="mt-1 block text-[11px] leading-relaxed text-muted-foreground/70">{hint}</span> : null}
@@ -109,7 +109,7 @@ export function TextInput({
         if (isEnterCommit(e)) onEnter?.()
       }}
       className={cn(
-        "min-h-11 w-full rounded-lg border border-input bg-background/60 px-3 py-2.5 text-base text-foreground outline-none transition-colors placeholder:text-muted-foreground/50 focus:border-ring focus:ring-2 focus:ring-ring/30 sm:min-h-0 sm:py-2 sm:text-sm",
+        "min-h-11 min-w-0 w-full rounded-lg border border-input bg-background/60 px-3 py-2.5 text-base text-foreground outline-none transition-colors placeholder:text-muted-foreground/50 focus:border-ring focus:ring-2 focus:ring-ring/30 sm:min-h-0 sm:py-2 sm:text-sm",
         className,
       )}
     />
@@ -138,7 +138,7 @@ export function MoneyInput({
   const shown = focused ? draft : displayDecimal(value)
 
   return (
-    <div className={cn("relative", className)}>
+    <div className={cn("relative min-w-0", className)}>
       <span
         className={cn(
           "pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-base tnum sm:text-sm",
@@ -169,7 +169,7 @@ export function MoneyInput({
           if (isEnterCommit(e)) onEnter?.()
         }}
         className={cn(
-          "min-h-11 w-full rounded-lg border border-input bg-background/60 py-2.5 pl-7 pr-3 text-base tnum text-foreground outline-none transition-colors placeholder:text-muted-foreground/40 focus:ring-2 sm:min-h-0 sm:py-2 sm:text-sm",
+          "min-h-11 min-w-0 w-full rounded-lg border border-input bg-background/60 py-2.5 pl-7 pr-3 text-base tnum text-foreground outline-none transition-colors placeholder:text-muted-foreground/40 focus:ring-2 sm:min-h-0 sm:py-2 sm:text-sm",
           focusClass(tone),
         )}
       />
