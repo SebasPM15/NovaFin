@@ -77,17 +77,28 @@ function exportBackup() {
 async function importBackup(file: File) {
   try {
     const text = await file.text()
-    const data = JSON.parse(text) as { state?: { config?: unknown } }
-    if (data?.state?.config) {
-      localStorage.setItem("novafin-v2", JSON.stringify(data))
-      window.alert("Datos restaurados correctamente. El simulador se recargará.")
-      window.location.reload()
+    const raw = JSON.parse(text) as Record<string, unknown>
+
+    const payload: Record<string, unknown> | null =
+      raw?.config
+        ? raw
+        : (raw?.state as Record<string, unknown> | undefined)?.config
+          ? (raw.state as Record<string, unknown>)
+          : null
+
+    if (!payload?.config) {
+      window.alert(
+        "Archivo JSON inválido o de otro formato.\n\nAsegúrate de importar un archivo exportado desde NovaFin."
+      )
       return
     }
-    window.alert("Archivo JSON inválido o corrupto.")
+
+    localStorage.setItem("novafin-v2", JSON.stringify(payload))
+    window.alert("✅ Datos restaurados correctamente. La app se recargará ahora.")
+    window.location.reload()
   } catch (err) {
     console.error(err)
-    window.alert("Error procesando el archivo JSON.")
+    window.alert("Error procesando el archivo JSON. El archivo puede estar corrupto.")
   }
 }
 
