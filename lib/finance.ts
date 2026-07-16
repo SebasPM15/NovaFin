@@ -103,15 +103,37 @@ export interface IngresoExtra {
   distribucion: DistribucionIngreso[]
 }
 
+export type MetaTipo = "simple" | "grupo"
+
+export interface WishlistItem {
+  id: string
+  nombre: string
+  precio: number
+  prioridad: Prioridad
+  comprado: boolean
+  link?: string
+}
+
 export interface Meta {
   id: string
   nombre: string
   categoria: string
-  precio: number
+  precio: number // Original price or cached fallback. Used actively if "simple"
   prioridad: Prioridad
   comprado: boolean
   mesComprado: string | null
   cuentaId?: string // which account to debit when purchased (defaults to first "ahorro" account)
+  
+  // Wishlist grouping fields
+  tipo?: MetaTipo
+  items?: WishlistItem[]
+}
+
+export function precioEfectivoMeta(meta: Meta): number {
+  if (meta.tipo === "grupo" && meta.items) {
+    return meta.items.filter(item => !item.comprado).reduce((acc, item) => acc + item.precio, 0)
+  }
+  return meta.precio
 }
 
 export interface SaldoCuenta {
@@ -670,7 +692,19 @@ export function generarProyeccion(
   return filas
 }
 
-export function primerMesQueAlcanza(proyeccion: Fila[], objetivo: number): string | null {
-  if (objetivo <= 0) return null
-  return proyeccion.find((f) => f.ahorroAcumulado >= objetivo)?.mes || null
+
+/**
+ * Returns the first month key where the projected 'saldo' in the given account reaches the required amount.
+ * Si cuentaId no se provee, verifica contra el total del ahorroAcumulado (legacy).
+ */
+export function primerMesQueAlcanza(proyeccion: Fila[], required: number, cuentaId?: string): string | null {
+  for (const f of proyeccion) {
+    if (cuentaId) {
+      const s = f.saldosPorCuenta.find(x => x.cuentaId === cuentaId)
+      if (s && s.saldo >= required) return f.mes
+    } else {
+      if (f.ahorroAcumulado >= required) return f.mes
+    }
+  }
+  return null
 }
