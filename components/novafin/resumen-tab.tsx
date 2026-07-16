@@ -12,6 +12,7 @@ import {
   monthLabel,
   nowKey,
   primerMesQueAlcanza,
+  precioEfectivoMeta,
 } from "@/lib/finance"
 import { ProjectionChart } from "./projection-chart"
 import { Panel } from "./ui-kit"
@@ -60,7 +61,7 @@ export function ResumenTab({
   const proximaMeta = useMemo(() => {
     let mejor: { meta: Meta; mes: string } | null = null
     for (const m of metasPendientes) {
-      const mes = primerMesQueAlcanza(proyeccion, m.precio)
+      const mes = primerMesQueAlcanza(proyeccion, precioEfectivoMeta(m))
       if (mes && (!mejor || compareKeys(mes, mejor.mes) < 0)) mejor = { meta: m, mes }
     }
     return mejor
@@ -68,7 +69,7 @@ export function ResumenTab({
 
   const metasAlcanzablesPorMes: Record<string, Meta[]> = {}
   metasPendientes.forEach((m) => {
-    const mes = primerMesQueAlcanza(proyeccion, m.precio)
+    const mes = primerMesQueAlcanza(proyeccion, precioEfectivoMeta(m))
     if (mes) (metasAlcanzablesPorMes[mes] ||= []).push(m)
   })
 
@@ -121,7 +122,7 @@ export function ResumenTab({
           <Target className="mt-0.5 size-5 shrink-0 text-primary" />
           <p className="text-sm leading-relaxed text-foreground">
             Tu próxima meta alcanzable es <strong>{proximaMeta.meta.nombre}</strong> (
-            <span className="tnum">${fmt(proximaMeta.meta.precio)}</span>) — la tendrías cubierta en{" "}
+            <span className="tnum">${fmt(precioEfectivoMeta(proximaMeta.meta))}</span>) — la tendrías cubierta en{" "}
             <strong className="text-primary">{monthLabel(proximaMeta.mes, true)}</strong>.
           </p>
         </div>
