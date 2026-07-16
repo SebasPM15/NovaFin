@@ -254,9 +254,11 @@ export function ControlTab({
   const [cuentaGastosSeleccionada, setCuentaGastosSeleccionada] = useState(cuentaGastosDefault)
   const gastos = (gastosPorMes[mes] || []).filter((g) => g.cuentaId === cuentaGastosSeleccionada)
   const saldoCuenta = fila?.saldosPorCuenta.find((s) => s.cuentaId === cuentaGastosSeleccionada)
-  const disponible = saldoCuenta?.depositoBase ?? fila?.disponibleBase ?? 0
-  const usado = gastos.reduce((s: number, g) => s + (Number(g.monto) || 0), 0)
-  const restante = disponible - usado
+  
+  // El disponible real es TODO el dinero en la cuenta antes de restarle los gastos del mes.
+  const usado = saldoCuenta ? saldoCuenta.gastoDelMes : gastos.reduce((s: number, g) => s + (Number(g.monto) || 0), 0)
+  const restante = saldoCuenta ? saldoCuenta.saldo : (fila?.disponibleBase ?? 0) - usado
+  const disponible = restante + usado
 
   const [nuevoGasto, setNuevoGasto] = useState({ concepto: "", monto: "" })
   const [errorGasto, setErrorGasto] = useState("")
