@@ -153,7 +153,27 @@ function IngresosPanel({
           onEnter={agregar}
         />
         <Field label="Monto total del ingreso">
-          <MoneyInput value={montoTotal} onChange={setMontoTotal} placeholder="0,00" onEnter={agregar} />
+          <MoneyInput
+            value={montoTotal}
+            onChange={(v) => {
+              setMontoTotal(v)
+              const newTotal = parseDecimal(v) || 0
+              if (cuentas.length > 1) {
+                setDistribucion((prev: Record<string, string>) => {
+                  const next = { ...prev }
+                  const lastIdx = cuentas.length - 1
+                  const sumOthers = cuentas
+                    .slice(0, lastIdx)
+                    .reduce((s, x) => s + (parseDecimal(next[x.id]) || 0), 0)
+                  const restante = Math.max(newTotal - sumOthers, 0)
+                  next[cuentas[lastIdx].id] = restante > 0 ? String(restante) : ""
+                  return next
+                })
+              }
+            }}
+            placeholder="0,00"
+            onEnter={agregar}
+          />
         </Field>
 
         {total > 0 && cuentas.length > 1 && (
