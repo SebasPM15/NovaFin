@@ -1,7 +1,7 @@
 "use client"
 
 import { type Dispatch, type SetStateAction, useEffect, useMemo, useState } from "react"
-import { Plus, Trash2, Wallet, PiggyBank, Banknote, TrendingUp } from "lucide-react"
+import { Plus, Trash2, Wallet, PiggyBank, Banknote, TrendingUp, ArrowRightLeft, AlertTriangle } from "lucide-react"
 import {
   type AjustesAhorro,
   type Config,
@@ -11,6 +11,7 @@ import {
   type IngresoExtra,
   type IngresosPorMes,
   type SaldosReales,
+  type TransferenciasPorMes,
   fmt, monthLabel, uid, cuentaGastosId, cuentaAhorroId,
 } from "@/lib/finance"
 import { Field, MoneyInput, Segmented, TextInput, parseDecimal, toneFromTipo } from "./ui-kit"
@@ -209,6 +210,187 @@ function IngresosPanel({
   )
 }
 
+// ── Transfers panel ──────────────────────────────────────────────────────────
+function TransferenciasPanel({
+  mes,
+  cuentas,
+  transferenciasPorMes,
+  setTransferenciasPorMes,
+  saldosRealesAhorro,
+  saldosRealesGastos,
+  fila,
+}: {
+  mes: string
+  cuentas: Cuenta[]
+  transferenciasPorMes: TransferenciasPorMes
+  setTransferenciasPorMes: Dispatch<SetStateAction<TransferenciasPorMes>>
+  saldosRealesAhorro: SaldosReales
+  saldosRealesGastos: SaldosReales
+  fila: Fila | undefined
+}) {
+  const transferencias = transferenciasPorMes[mes] || []
+
+  const [origen, setOrigen] = useState(cuentas[0]?.id ?? "")
+  const [destino, setDestino] = useState(cuentas[1]?.id ?? cuentas[0]?.id ?? "")
+  const [concepto, setConcepto] = useState("")
+  const [monto, setMonto] = useState("")
+  const [error, setError] = useState("")
+
+  // Ensure destino != origen when origen changes
+  useEffect(() => {
+    if (destino === origen) {
+      const alt = cuentas.find((c) => c.id !== origen)
+      if (alt) setDestino(alt.id)
+    }
+  }, [origen, cuentas, destino])
+
+  const agregar = () => {
+    const m = parseDecimal(monto)
+    if (!m || m <= 0) return setError("El monto debe ser mayor a 0.")
+    if (origen === destino) return setError("Origen y destino deben ser distintos.")
+    setTransferenciasPorMes((prev) => ({
+      ...prev,
+      [mes]: [
+        ...(prev[mes] || []),
+        {
+          id: uid(),
+          concepto: concepto.trim() || "Transferencia",
+          monto: m,
+          cuentaOrigenId: origen,
+          cuentaDestinoId: destino,
+        },
+      ],
+    }))
+    setConcepto("")
+    setMonto("")
+    setError("")
+  }
+  const borrar = (id: string) =>
+    setTransferenciasPorMes((prev) => ({ ...prev, [mes]: (prev[mes] || []).filter((t) => t.id !== id) }))
+
+  // Cierre Real warning (scoped to dual mode only per spec §3a)
+  const cierreOrigenSellado = origen === "ahorro" && saldosRealesAhorro[mes] !== undefined && saldosRealesAhorro[mes] !== ""
+  const cierreDestinoSellado = destino === "gastos" && saldosRealesGastos[mes] !== undefined && saldosRealesGastos[mes] !== ""
+  const cierreDestinoSellado2 = destino === "ahorro" && saldosRealesAhorro[mes] !== undefined && saldosRealesAhorro[mes] !== ""
+  const cierreOrigenSellado2 = origen === "gastos" && saldosRealesGastos[mes] !== undefined && saldosRealesGastos[mes] !== ""
+  const hasCierreWarning = cierreOrigenSellado || cierreDestinoSellado || cierreDestinoSellado2 || cierreOrigenSellado2
+
+  const cuentaSellada = cierreOrigenSellado || cierreOrigenSellado2
+    ? cuentas.find((c) => c.id === origen)?.nombre ?? origen
+    : cuentas.find((c) => c.id === destino)?.nombre ?? destino
+
+  return (
+    <div className="space-y-4 rounded-xl border border-milestone/25 bg-milestone/[0.03] p-5">
+      <div className="flex flex-col gap-1 items-start">
+        <div className="flex items-center gap-2 text-milestone">
+          <ArrowRightLeft className="size-4" />
+          <span className="text-[11px] font-semibold uppercase tracking-widest">Transferencias</span>
+        </div>
+        <span className="text-[10px] text-muted-foreground/70">Mueve dinero entre tus cuentas sin salirte del sistema.</span>
+      </div>
+
+      {/* List */}
+      <div className="min-h-[64px] divide-y divide-border rounded-lg border border-border">
+        {transferencias.length === 0 && (
+          <div className="px-4 py-6 text-center text-sm text-muted-foreground/60">Sin transferencias</div>
+        )}
+        {transferencias.map((t) => {
+          const cOrig = cuentas.find((c) => c.id === t.cuentaOrigenId)
+          const cDest = cuentas.find((c) => c.id === t.cuentaDestinoId)
+          return (
+            <div key={t.id} className="flex items-center justify-between px-3 py-2.5 text-sm hover:bg-secondary/30 transition-colors">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className={cn("inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-medium shrink-0", cOrig ? cuentaColor(cOrig) : "text-muted-foreground border-border")}>
+                  {cOrig?.nombre ?? t.cuentaOrigenId}
+                </span>
+                <span className="text-muted-foreground text-xs">→</span>
+                <span className={cn("inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-medium shrink-0", cDest ? cuentaColor(cDest) : "text-muted-foreground border-border")}>
+                  {cDest?.nombre ?? t.cuentaDestinoId}
+                </span>
+                {t.concepto !== "Transferencia" && (
+                  <span className="text-muted-foreground/70 text-xs truncate ml-1">({t.concepto})</span>
+                )}
+              </div>
+              <div className="flex shrink-0 items-center gap-3 pl-2">
+                <span className="tnum text-milestone font-medium">${fmt(t.monto)}</span>
+                <button
+                  type="button"
+                  onClick={() => borrar(t.id)}
+                  aria-label={`Borrar transferencia ${t.concepto}`}
+                  className="text-muted-foreground hover:text-destructive transition-colors"
+                >
+                  <Trash2 className="size-3.5" />
+                </button>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Form */}
+      <div className="space-y-3 rounded-lg border border-border bg-background/50 p-3">
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="Origen">
+            <select
+              value={origen}
+              onChange={(e) => setOrigen(e.target.value)}
+              className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm text-foreground outline-none focus:border-ring min-w-0"
+            >
+              {cuentas.map((c) => (
+                <option key={c.id} value={c.id}>{c.nombre}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Destino">
+            <select
+              value={destino}
+              onChange={(e) => setDestino(e.target.value)}
+              className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm text-foreground outline-none focus:border-ring min-w-0"
+            >
+              {cuentas.filter((c) => c.id !== origen).map((c) => (
+                <option key={c.id} value={c.id}>{c.nombre}</option>
+              ))}
+            </select>
+          </Field>
+        </div>
+        <TextInput
+          value={concepto}
+          onChange={setConcepto}
+          placeholder="Concepto (opcional)"
+          onEnter={agregar}
+        />
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+          <MoneyInput
+            className="w-full sm:flex-1"
+            value={monto}
+            onChange={setMonto}
+            placeholder="Monto"
+            onEnter={agregar}
+          />
+          <button
+            type="button"
+            onClick={agregar}
+            className="inline-flex min-h-11 w-full items-center justify-center gap-1 rounded-lg bg-milestone px-3 py-2.5 text-sm font-medium text-black/80 transition-opacity hover:opacity-90 sm:min-h-0 sm:w-auto sm:py-2"
+          >
+            <ArrowRightLeft className="size-4" />
+            Transferir
+          </button>
+        </div>
+        {error && <p className="text-xs text-destructive">{error}</p>}
+
+        {hasCierreWarning && (
+          <div className="flex items-start gap-2 rounded-md border border-yellow-600/30 bg-yellow-600/5 px-3 py-2">
+            <AlertTriangle className="size-4 shrink-0 text-yellow-500 mt-0.5" />
+            <p className="text-[11px] leading-relaxed text-yellow-200/80">
+              Este mes ya tiene un <strong>Cierre Real</strong> sellado en <strong>{cuentaSellada}</strong>. La transferencia se registrará, pero no cambiará el saldo mostrado de {monthLabel(mes)} hasta que ajustes o borres ese cierre.
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Main ControlTab ───────────────────────────────────────────────────────────
 export function ControlTab({
   config,
@@ -223,6 +405,8 @@ export function ControlTab({
   setSaldosRealesGastos,
   ingresosPorMes,
   setIngresosPorMes,
+  transferenciasPorMes,
+  setTransferenciasPorMes,
 }: {
   config: Config
   proyeccion: Fila[]
@@ -236,6 +420,8 @@ export function ControlTab({
   setSaldosRealesGastos: Dispatch<SetStateAction<SaldosReales>>
   ingresosPorMes: IngresosPorMes
   setIngresosPorMes: Dispatch<SetStateAction<IngresosPorMes>>
+  transferenciasPorMes: TransferenciasPorMes
+  setTransferenciasPorMes: Dispatch<SetStateAction<TransferenciasPorMes>>
 }) {
   const [mes, setMes] = useState(config.mesInicio)
   useEffect(() => {
@@ -347,8 +533,7 @@ export function ControlTab({
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <MiniStat label="Disponible" value={disponible} tone="gastos" />
+          <div className="grid grid-cols-1 gap-3">
             <MiniStat label="Restante" value={restante} tone={restante < 0 ? "danger" : "gastos"} />
           </div>
 
@@ -360,6 +545,9 @@ export function ControlTab({
               <Row key={g.id} concepto={g.concepto} monto={`-$${fmt(g.monto)}`} tone="danger" onDelete={() => borrarGasto(g.id)} />
             ))}
           </div>
+
+          {/* Read-only transfer chips */}
+          <TransferChips cuentaId={cuentaGastosSeleccionada} mes={mes} transferenciasPorMes={transferenciasPorMes} cuentas={config.cuentas} />
 
           <div className="space-y-2 rounded-lg border border-border bg-background/50 p-3">
             <TextInput
@@ -427,8 +615,7 @@ export function ControlTab({
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <MiniStat label="Aporte base" value={fila?.saldosPorCuenta.find(s => s.cuentaId === cuentaAjusteSeleccionada)?.depositoBase ?? fila?.depositoBase ?? 0} tone="ahorro" />
+          <div className="grid grid-cols-1 gap-3">
             <MiniStat label="Total del mes" value={fila?.saldosPorCuenta.find(s => s.cuentaId === cuentaAjusteSeleccionada)?.saldo ?? fila?.ahorroAcumulado ?? 0} tone="ahorro" />
           </div>
 
@@ -446,6 +633,9 @@ export function ControlTab({
               />
             ))}
           </div>
+
+          {/* Read-only transfer chips */}
+          <TransferChips cuentaId={cuentaAjusteSeleccionada} mes={mes} transferenciasPorMes={transferenciasPorMes} cuentas={config.cuentas} />
 
           <div className="space-y-2 rounded-lg border border-border bg-background/50 p-3">
             <TextInput
@@ -500,16 +690,68 @@ export function ControlTab({
           />
         </div>
         )}
-      </div>
 
-      <div className={cn("mt-4", isSingle ? "max-w-xl mx-auto" : "")}>
+        {/* ── Row 2 ── */}
         <IngresosPanel
           mes={mes}
           cuentas={config.cuentas}
           ingresosPorMes={ingresosPorMes}
           setIngresosPorMes={setIngresosPorMes}
         />
+
+        {!isSingle && (
+          <TransferenciasPanel
+            mes={mes}
+            cuentas={config.cuentas}
+            transferenciasPorMes={transferenciasPorMes}
+            setTransferenciasPorMes={setTransferenciasPorMes}
+            saldosRealesAhorro={saldosRealesAhorro}
+            saldosRealesGastos={saldosRealesGastos}
+            fila={fila}
+          />
+        )}
       </div>
+    </div>
+  )
+}
+
+// ── Transfer chips (read-only, inside Gastos / Ahorro panels) ────────────────
+function TransferChips({
+  cuentaId,
+  mes,
+  transferenciasPorMes,
+  cuentas,
+}: {
+  cuentaId: string
+  mes: string
+  transferenciasPorMes: TransferenciasPorMes
+  cuentas: Cuenta[]
+}) {
+  const transfers = (transferenciasPorMes[mes] || []).filter(
+    (t) => t.cuentaOrigenId === cuentaId || t.cuentaDestinoId === cuentaId,
+  )
+  if (transfers.length === 0) return null
+
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {transfers.map((t) => {
+        const isOutgoing = t.cuentaOrigenId === cuentaId
+        const otherAccountId = isOutgoing ? t.cuentaDestinoId : t.cuentaOrigenId
+        const otherAccount = cuentas.find((c) => c.id === otherAccountId)
+        const arrow = isOutgoing ? "→" : "←"
+        const sign = isOutgoing ? "-" : "+"
+        const color = isOutgoing
+          ? "text-destructive/80 border-destructive/20 bg-destructive/5"
+          : "text-primary/80 border-primary/20 bg-primary/5"
+        return (
+          <span
+            key={t.id}
+            className={cn("inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium", color)}
+          >
+            {arrow} {otherAccount?.nombre ?? otherAccountId}: {sign}${fmt(t.monto)}
+          </span>
+        )
+      })}
     </div>
   )
 }

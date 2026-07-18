@@ -202,12 +202,12 @@ export function ConfigTab({
   // Gastos is always the "last" / residual account
   const handleAhorroBase = (v: string) => {
     const ahorro = parseDecimal(v) || 0
-    const gastos = Math.max(sueldoEfectivo - ahorro, 0)
+    const gastos = Math.max(Math.round((sueldoEfectivo - ahorro) * 100) / 100, 0)
     set({ ahorroBase: ahorro, gastoBase: gastos })
   }
   const handleGastoBase = (v: string) => {
     const gastos = parseDecimal(v) || 0
-    const ahorro = Math.max(sueldoEfectivo - gastos, 0)
+    const ahorro = Math.max(Math.round((sueldoEfectivo - gastos) * 100) / 100, 0)
     set({ gastoBase: gastos, ahorroBase: ahorro })
   }
 
@@ -253,7 +253,10 @@ export function ConfigTab({
   const lastIdx = config.cuentas.length - 1
 
   return (
-    <div className="max-w-2xl space-y-5">
+    <div className="max-w-5xl mx-auto space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+        {/* Left Column */}
+        <div className="space-y-6">
       {/* ── Modelo de cuentas ── */}
       <Panel>
         <div className="mb-3 flex items-center gap-2">
@@ -325,14 +328,6 @@ export function ConfigTab({
                   placeholder="0,00"
                 />
               </Field>
-              <Field label="Saldo inicial">
-                <MoneyInput
-                  tone="ahorro"
-                  value={config.ahorroActual || ""}
-                  onChange={(v) => set({ ahorroActual: parseDecimal(v) || 0 })}
-                  placeholder="0,00"
-                />
-              </Field>
             </div>
           </div>
 
@@ -347,14 +342,6 @@ export function ConfigTab({
                   tone="gastos"
                   value={config.gastoBase || ""}
                   onChange={handleGastoBase}
-                  placeholder="0,00"
-                />
-              </Field>
-              <Field label="Sobrante inicial">
-                <MoneyInput
-                  tone="gastos"
-                  value={config.gastosActual || ""}
-                  onChange={(v) => set({ gastosActual: parseDecimal(v) || 0 })}
                   placeholder="0,00"
                 />
               </Field>
@@ -611,6 +598,11 @@ export function ConfigTab({
         )}
       </Panel>
 
+        </div>
+
+        {/* Right Column */}
+        <div className="space-y-6">
+
       {/* ── Horizonte ── */}
       <Panel>
         <div className="mb-4 flex items-center gap-2">
@@ -793,50 +785,111 @@ export function ConfigTab({
         )}
       </Panel>
 
-      {/* ── Descuento temporal ── */}
+      {/* ── Descuentos Temporales ── */}
       <Panel>
-        <label className="flex cursor-pointer items-start gap-3">
-          <input
-            type="checkbox"
-            checked={config.descuentoActivo}
-            onChange={(e) => set({ descuentoActivo: e.target.checked })}
-            className="mt-0.5 size-4 accent-[var(--color-accent)]"
-          />
-          <span className="text-sm text-foreground">
-            Descuento temporal del disponible mensual
-            {" "}
-            <span className="mt-0.5 block text-xs text-muted-foreground">
-              Por ejemplo, ayuda a un familiar durante algunos meses.
-            </span>
-          </span>
-        </label>
-        {config.descuentoActivo && (
-          <div className="mt-4 grid grid-cols-1 gap-4 border-t border-border/60 pt-4 sm:grid-cols-3">
-            <Field label="Afectar directamente a">
-              <select
-                value={config.descuentoCuentaId}
-                onChange={(e) => set({ descuentoCuentaId: e.target.value })}
-                className="w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring"
-              >
-                <option value="">A la cuenta de Gastos (Automático)</option>
-                {config.cuentas.map((c) => (
-                  <option key={c.id} value={c.id}>{c.nombre}</option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Monto del descuento / mes">
-              <MoneyInput
-                tone="gastos"
-                value={config.descuentoMonto || ""}
-                onChange={(v) => set({ descuentoMonto: parseDecimal(v) || 0 })}
-                placeholder="0,00"
-              />
-            </Field>
-            <Field label="Último mes del descuento">
-              <TextInput type="month" value={config.descuentoMesFin} onChange={(v) => set({ descuentoMesFin: v })} />
-            </Field>
+        <div className="mb-4 flex items-center gap-2">
+          <Banknote className="size-4 text-muted-foreground" />
+          <SectionLabel>Descuentos o Préstamos Activos</SectionLabel>
+        </div>
+        <span className="mb-4 block text-xs text-muted-foreground leading-relaxed">
+          Por ejemplo, una ayuda temporal a un familiar o el pago programado de un préstamo durante algunos meses.
+        </span>
+        
+        {(!config.descuentos || config.descuentos.length === 0) && (
+           <div className="mb-4 border border-dashed border-border rounded-lg p-5 text-center text-sm text-muted-foreground">
+             No tienes descuentos temporales configurados.
+           </div>
+        )}
+
+        {config.descuentos && config.descuentos.length > 0 && (
+          <div className="mb-4 divide-y divide-border/60 border-t border-b border-border/60">
+            {config.descuentos.map((d, i) => (
+              <div key={d.id} className="py-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="font-medium text-[13px] text-foreground">Descuento {i + 1}</div>
+                  <button type="button" onClick={() => {
+                     set({ descuentos: config.descuentos!.filter(x => x.id !== d.id) })
+                  }} className="text-muted-foreground hover:text-destructive transition-colors">
+                    <Trash2 className="size-4" />
+                  </button>
+                </div>
+                
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <Field label="Concepto (ej. Préstamo)">
+                    <TextInput value={d.concepto} onChange={v => {
+                       const next = [...config.descuentos!]
+                       next[i] = { ...d, concepto: v }
+                       set({ descuentos: next })
+                    }} placeholder="Motivo o beneficiario" />
+                  </Field>
+                  <Field label="Cuenta afectada">
+                    <select
+                      value={d.cuentaId}
+                      onChange={(e) => {
+                         const next = [...config.descuentos!]
+                         next[i] = { ...d, cuentaId: e.target.value }
+                         set({ descuentos: next })
+                      }}
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring"
+                    >
+                      {config.cuentas.map((c) => (
+                        <option key={c.id} value={c.id}>{c.nombre}</option>
+                      ))}
+                    </select>
+                  </Field>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  <Field label="Monto / mes">
+                    <MoneyInput
+                      tone="gastos"
+                      value={d.monto || ""}
+                      onChange={(v) => {
+                         const next = [...config.descuentos!]
+                         next[i] = { ...d, monto: parseDecimal(v) || 0 }
+                         set({ descuentos: next })
+                      }}
+                      placeholder="0,00"
+                    />
+                  </Field>
+                  <Field label="Desde (mes de inicio)">
+                    <TextInput type="month" value={d.mesInicio} onChange={v => {
+                       const next = [...config.descuentos!]
+                       next[i] = { ...d, mesInicio: v }
+                       set({ descuentos: next })
+                    }} />
+                  </Field>
+                  <Field label="Hasta (opcional)">
+                    <TextInput type="month" value={d.mesFin} onChange={v => {
+                       const next = [...config.descuentos!]
+                       next[i] = { ...d, mesFin: v }
+                       set({ descuentos: next })
+                    }} />
+                  </Field>
+                </div>
+              </div>
+            ))}
           </div>
         )}
+
+        <button
+          type="button"
+          onClick={() => {
+             const nuevo = {
+               id: uid(),
+               concepto: "",
+               monto: 0,
+               mesInicio: config.mesInicio,
+               mesFin: "",
+               cuentaId: config.cuentas.find(c => c.tipo === "gastos")?.id ?? config.cuentas[0].id
+             }
+             set({ descuentos: [...(config.descuentos || []), nuevo] })
+          }}
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-transparent py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary hover:bg-primary/5"
+        >
+          <Plus className="size-4" />
+          Añadir descuento temporal
+        </button>
       </Panel>
 
       {/* ── Portabilidad de Datos (Backups) ── */}
@@ -894,6 +947,8 @@ export function ConfigTab({
           <RotateCcw className="size-4" />
           Reiniciar
         </button>
+      </div>
+        </div>
       </div>
     </div>
   )

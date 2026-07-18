@@ -106,6 +106,8 @@ export default function Page() {
             setSaldosRealesGastos={nf.setSaldosRealesGastos}
             ingresosPorMes={nf.ingresosPorMes}
             setIngresosPorMes={nf.setIngresosPorMes}
+            transferenciasPorMes={nf.transferenciasPorMes}
+            setTransferenciasPorMes={nf.setTransferenciasPorMes}
           />
         )}
         {tab === "metas" && (
