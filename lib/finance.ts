@@ -49,6 +49,15 @@ export type ModificadorBase = {
   cuentas: { cuentaId: string; monto: number }[]
 }
 
+export interface DescuentoTemporal {
+  id: string
+  concepto: string       
+  monto: number
+  mesInicio: string      
+  mesFin: string
+  cuentaId: string       
+}
+
 export interface Config {
   sueldo: number
   // Legacy fields — kept for dual backward compat, derived from cuentas in dual mode
@@ -62,11 +71,13 @@ export interface Config {
   // Time
   mesInicio: string
   mesesAProyectar: number
-  // Discount
+  // Discount (Legacy single)
   descuentoActivo: boolean
   descuentoMonto: number
   descuentoMesFin: string
   descuentoCuentaId?: string
+  // Multiple discounts
+  descuentos?: DescuentoTemporal[]
   // IESS
   aportaIESS?: boolean          // si activo, sueldo es bruto; neto = sueldo * 0.9055
   // Sobresueldos (Décimos + Fondos de Reserva) — completamente opt-in
@@ -148,6 +159,7 @@ export interface SaldoCuenta {
   comprasDelMes: number
   tieneReal: boolean
   sobresueldoDelMes: number  // décimos + fondos de reserva aplicados a esta cuenta este mes
+  transferenciasDelMes: number  // net of incoming minus outgoing this month
   // For single accounts with limiteGasto: show virtual split
   ahorroVirtual?: number
   gastosVirtual?: number
@@ -190,6 +202,16 @@ export type GastosPorMes = Record<string, Gasto[]>
 export type AjustesAhorro = Record<string, Ajuste[]>
 export type SaldosReales = Record<string, string | number>
 export type IngresosPorMes = Record<string, IngresoExtra[]>
+
+export interface Transferencia {
+  id: string
+  concepto: string       // optional label, default e.g. "Transferencia"
+  monto: number           // always positive
+  cuentaOrigenId: string
+  cuentaDestinoId: string
+}
+
+export type TransferenciasPorMes = Record<string, Transferencia[]>
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 export const MESES_ES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
@@ -436,6 +458,7 @@ export function generarProyeccion(
   saldosRealesAhorro: SaldosReales = {},
   saldosRealesGastos: SaldosReales = {},
   ingresosPorMes: IngresosPorMes = {},
+  transferenciasPorMes: TransferenciasPorMes = {},
 ): Fila[] {
   const meses: string[] = []
   for (let i = 0; i < config.mesesAProyectar; i++) meses.push(addMonths(config.mesInicio, i))
@@ -488,12 +511,25 @@ export function generarProyeccion(
         }
       }
 
-      // ─── Descuento Temporal Universal ───
-      const targetDescuentoId = config.descuentoCuentaId || cuentaGastosId(config.cuentas)
-      if (cid === targetDescuentoId && config.descuentoActivo) {
-        const enRango = compareKeys(mesKey, config.mesInicio) >= 0 && compareKeys(mesKey, config.descuentoMesFin) <= 0
-        if (enRango) {
-          depositoBase -= Number(config.descuentoMonto) || 0
+      // ─── Descuentos Temporales ───
+      // Procesar múltiples descuentos en base al array nuevo
+      if (config.descuentos && config.descuentos.length > 0) {
+        for (const d of config.descuentos) {
+          if (d.cuentaId === cid) {
+            const enRango = compareKeys(mesKey, d.mesInicio) >= 0 && (!d.mesFin || compareKeys(mesKey, d.mesFin) <= 0)
+            if (enRango) {
+              depositoBase -= Number(d.monto) || 0
+            }
+          }
+        }
+      } else {
+        // Fallback for legacy format if array is missing
+        const targetDescuentoId = config.descuentoCuentaId || cuentaGastosId(config.cuentas)
+        if (cid === targetDescuentoId && config.descuentoActivo) {
+          const enRango = compareKeys(mesKey, config.mesInicio) >= 0 && compareKeys(mesKey, config.descuentoMesFin) <= 0
+          if (enRango) {
+            depositoBase -= Number(config.descuentoMonto) || 0
+          }
         }
       }
 
@@ -512,6 +548,15 @@ export function generarProyeccion(
         .flatMap((i) => i.distribucion)
         .filter((d) => d.cuentaId === cid)
         .reduce((s, d) => s + (Number(d.monto) || 0), 0)
+
+      // --- Transferencias ---
+      const transferenciasSalientes = (transferenciasPorMes[mesKey] || [])
+        .filter((t) => t.cuentaOrigenId === cid)
+        .reduce((s, t) => s + (Number(t.monto) || 0), 0)
+      const transferenciasEntrantes = (transferenciasPorMes[mesKey] || [])
+        .filter((t) => t.cuentaDestinoId === cid)
+        .reduce((s, t) => s + (Number(t.monto) || 0), 0)
+      const transferenciasNetas = transferenciasEntrantes - transferenciasSalientes
 
       // --- Sobresueldos (décimos + fondos de reserva) ---
       let sobresueldoDelMes = 0
@@ -588,15 +633,15 @@ export function generarProyeccion(
       // --- Calculate new balance ---
       if (cuenta.tipo === "gastos" || (cuenta.tipo === "general" && config.modeloCuentas !== "dual")) {
         // Gastos: depositoBase is the available pool, sobrante accumulates
-        const sobrante = Math.max(depositoBase - gastosDelMes + ingresoDelMes + sobresueldoDelMes, 0)
+        const sobrante = Math.max(depositoBase - gastosDelMes + ingresoDelMes + sobresueldoDelMes + transferenciasNetas, 0)
         if (realOverride !== undefined) {
           acum[cid] = realOverride
         } else {
           acum[cid] += sobrante
         }
       } else {
-        // Ahorro: deposits + adjustments + income + sobresueldos - purchases
-        const nuevo = acum[cid] + depositoBase + ajustesDelMes + ingresoDelMes + sobresueldoDelMes - comprasDelMes
+        // Ahorro: deposits + adjustments + income + sobresueldos - purchases + transfers
+        const nuevo = acum[cid] + depositoBase + ajustesDelMes + ingresoDelMes + sobresueldoDelMes - comprasDelMes + transferenciasNetas
         if (realOverride !== undefined) {
           acum[cid] = realOverride
         } else {
@@ -625,6 +670,7 @@ export function generarProyeccion(
         comprasDelMes,
         tieneReal,
         sobresueldoDelMes,
+        transferenciasDelMes: transferenciasNetas,
         ...(ahorroVirtual !== undefined ? { ahorroVirtual, gastosVirtual } : {}),
       })
     }

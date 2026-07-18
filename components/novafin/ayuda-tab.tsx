@@ -36,6 +36,16 @@ export function AyudaTab() {
             <li><strong>Custom (Personalizado):</strong> Crea tantas cuentas ("Sobres") como quieras. Podrás repartir tu sueldo exacto entre ellas.</li>
           </ul>
         </FaqItem>
+        <FaqItem title="Múltiples Descuentos y Préstamos Temporales">
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Si te comprometes a pagar una deuda, un préstamo o a dar una cuota fija a un familiar, puedes registrarlo en la sección <strong>Descuentos o Préstamos Activos</strong> de la Configuración.
+          </p>
+          <ul className="mt-3 space-y-2 text-sm text-muted-foreground ml-4 list-disc marker:text-primary/50">
+            <li>Puedes añadir <strong>múltiples descuentos</strong> en simultáneo. Todos se apilarán y restarán del mes respectivo de forma automática.</li>
+            <li>Puedes elegir exactamente de qué cuenta afectará el descuento (Gastos, Ahorro, etc).</li>
+            <li>Un descuento que no tenga mes límite (Hasta) se aplicará indefinidamente.</li>
+          </ul>
+        </FaqItem>
       </div>
 
       <h3 className="font-display text-lg font-bold text-foreground px-1 mt-10 mb-2 flex items-center gap-2">
@@ -102,6 +112,16 @@ export function AyudaTab() {
               Al instante, la tabla tomará ese número como verdad absoluta, descartando la proyección matemática inflada, y lanzará Abril empezando desde tu plata real.
             </p>
           </div>
+        </FaqItem>
+        
+        <FaqItem title="¿Cuándo utilizar Transferencias entre Cuentas?">
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            La funcionalidad de Transferencias te permite reubicar saldo de una cuenta (Ej. Ahorro) a otra cuenta (Ej. Gastos) sin alterar tus ingresos o egresos totales percibidos, resolviendo imprecisiones internas del flujo de dinero. 
+          </p>
+          <ul className="mt-3 space-y-2 text-sm text-muted-foreground ml-4 list-disc marker:text-primary/50">
+            <li>Puedes lanzar múltiples transferencias dinámicas por cuenta. Sus "Chips" visuales aparecerán en tu panel para recordarte qué movimientos internos se hicieron ese mes.</li>
+            <li><strong>Importante:</strong> Si el mes ya tiene <em>Cierre Real</em> sellado, la transferencia generará una advertencia visual para evitar descuadrar el saldo que tú mismo ajustaste.</li>
+          </ul>
         </FaqItem>
       </div>
 

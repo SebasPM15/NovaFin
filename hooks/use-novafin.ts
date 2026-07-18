@@ -8,8 +8,10 @@ import {
   type IngresosPorMes,
   type Meta,
   type SaldosReales,
+  type TransferenciasPorMes,
   DEFAULT_CONFIG,
   generarProyeccion,
+  uid,
 } from "@/lib/finance"
 
 const STORAGE_KEY = "novafin-v2"
@@ -22,6 +24,7 @@ interface StoredData {
   saldosRealesAhorro: SaldosReales
   saldosRealesGastos: SaldosReales
   ingresosPorMes: IngresosPorMes
+  transferenciasPorMes: TransferenciasPorMes
   onboarded: boolean
 }
 
@@ -35,6 +38,7 @@ export function useNovaFin() {
   const [saldosRealesAhorro, setSaldosRealesAhorro] = useState<SaldosReales>({})
   const [saldosRealesGastos, setSaldosRealesGastos] = useState<SaldosReales>({})
   const [ingresosPorMes, setIngresosPorMes] = useState<IngresosPorMes>({})
+  const [transferenciasPorMes, setTransferenciasPorMes] = useState<TransferenciasPorMes>({})
   const [onboarded, setOnboarded] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const [saveState, setSaveState] = useState<SaveState>("idle")
@@ -45,13 +49,31 @@ export function useNovaFin() {
       const raw = localStorage.getItem(STORAGE_KEY)
       if (raw) {
         const data = JSON.parse(raw) as Partial<StoredData>
-        if (data.config) setConfig({ ...DEFAULT_CONFIG, ...data.config })
+        if (data.config) {
+          const loadedConfig = { ...DEFAULT_CONFIG, ...data.config }
+          
+          // Migration: Convert legacy single discount to multiple discounts array
+          if (loadedConfig.descuentoActivo && (!loadedConfig.descuentos || loadedConfig.descuentos.length === 0)) {
+            loadedConfig.descuentos = [{
+              id: uid(),
+              concepto: "Descuento configurado",
+              monto: Number(loadedConfig.descuentoMonto) || 0,
+              mesInicio: loadedConfig.mesInicio,
+              mesFin: loadedConfig.descuentoMesFin,
+              cuentaId: loadedConfig.descuentoCuentaId || (loadedConfig.cuentas.find(c => c.tipo === "gastos")?.id ?? loadedConfig.cuentas[0].id),
+            }]
+            loadedConfig.descuentoActivo = false // Disable legacy field
+          }
+          
+          setConfig(loadedConfig)
+        }
         if (data.gastosPorMes) setGastosPorMes(data.gastosPorMes)
         if (data.metas) setMetas(data.metas)
         if (data.ajustesAhorro) setAjustesAhorro(data.ajustesAhorro)
         if (data.saldosRealesAhorro) setSaldosRealesAhorro(data.saldosRealesAhorro)
         if (data.saldosRealesGastos) setSaldosRealesGastos(data.saldosRealesGastos)
         if (data.ingresosPorMes) setIngresosPorMes(data.ingresosPorMes)
+        if (data.transferenciasPorMes) setTransferenciasPorMes(data.transferenciasPorMes)
         if (data.onboarded) setOnboarded(true)
       }
     } catch {
@@ -76,6 +98,7 @@ export function useNovaFin() {
             saldosRealesAhorro,
             saldosRealesGastos,
             ingresosPorMes,
+            transferenciasPorMes,
             onboarded,
           }),
         )
@@ -85,11 +108,11 @@ export function useNovaFin() {
       }
     }, 500)
     return () => clearTimeout(t)
-  }, [config, gastosPorMes, metas, ajustesAhorro, saldosRealesAhorro, saldosRealesGastos, ingresosPorMes, onboarded, loaded])
+  }, [config, gastosPorMes, metas, ajustesAhorro, saldosRealesAhorro, saldosRealesGastos, ingresosPorMes, transferenciasPorMes, onboarded, loaded])
 
   const proyeccion = useMemo(
-    () => generarProyeccion(config, gastosPorMes, metas, ajustesAhorro, saldosRealesAhorro, saldosRealesGastos, ingresosPorMes),
-    [config, gastosPorMes, metas, ajustesAhorro, saldosRealesAhorro, saldosRealesGastos, ingresosPorMes],
+    () => generarProyeccion(config, gastosPorMes, metas, ajustesAhorro, saldosRealesAhorro, saldosRealesGastos, ingresosPorMes, transferenciasPorMes),
+    [config, gastosPorMes, metas, ajustesAhorro, saldosRealesAhorro, saldosRealesGastos, ingresosPorMes, transferenciasPorMes],
   )
 
   const completeOnboarding = useCallback((nuevaConfig: Config) => {
@@ -105,6 +128,7 @@ export function useNovaFin() {
     setSaldosRealesAhorro({})
     setSaldosRealesGastos({})
     setIngresosPorMes({})
+    setTransferenciasPorMes({})
     setOnboarded(false)
   }, [])
 
@@ -123,6 +147,8 @@ export function useNovaFin() {
     setSaldosRealesGastos,
     ingresosPorMes,
     setIngresosPorMes,
+    transferenciasPorMes,
+    setTransferenciasPorMes,
     onboarded,
     loaded,
     saveState,

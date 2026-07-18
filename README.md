@@ -7,6 +7,8 @@ NovaFin es un simulador de finanzas personales diseñado para ofrecer una experi
 - 🎯 **Gestión de Metas:** Agrega metas, dales un precio y el sistema deducirá automáticamente en qué mes futuro tendrás el dinero suficiente para cumplirlas.
 - 📆 **Control Mensual y Multi-Cuenta:** Registra entradas y salidas de emergencia. Aplica "Cierres Reales" mes a mes para sincronizar con la realidad bancaria. Adicionalmente, cuenta con arquitectura **Single, Dual y Custom** para dividir tu sueldo en tantos "sobres" como desees.
 - 📉 **Periodos Financieros Temporales:** Programa subidas o bajadas de sueldo en ventanas específicas (ej. meses sin sueldo, bono especial, etc.) y la app redistribuirá inteligentemente el impacto en tus cuentas durante ese lapso.
+- ✂️ **Múltiples Descuentos Activos:** Administra créditos, deudas o ayudas familiares simultáneas; personaliza cuánto y de qué cuenta se debitará mes a mes de forma acumulativa y automática.
+- 🔄 **Transferencias Dinámicas:** Reubica y balancea el saldo entre tus cuentas internamente, registrando movimientos precisos en el "Control Mensual" sin afectar tu patrimonio.
 - 🎂 **Milestones Personales:** Incluye tu fecha de nacimiento para mostrar avisos motivacionales de la edad que tendrás al cumplir ciertos hitos financieros.
 - 🔒 **Privacidad Total (0-Backend):** Todos tus datos viven cifrados dentro de tu propio dispositivo. Adicionalmente, puedes descargar archivos de Respaldo (`.json`) para migrar tu data entre celular y computadora.
 

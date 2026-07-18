@@ -5,6 +5,7 @@ import { useState } from "react"
 import { cn } from "@/lib/utils"
 
 export { parseDecimal } from "@/lib/finance"
+import { fmt } from "@/lib/finance"
 
 export type MoneyTone = "neutral" | "ahorro" | "gastos"
 
@@ -135,7 +136,9 @@ export function MoneyInput({
   // Local draft so trailing "," survives while parent stores Number(...) mid-keystroke.
   const [focused, setFocused] = useState(false)
   const [draft, setDraft] = useState("")
-  const shown = focused ? draft : displayDecimal(value)
+  const shown = focused 
+    ? draft 
+    : (typeof value === "number" && Number.isFinite(value) ? fmt(value) : displayDecimal(value))
 
   return (
     <div className={cn("relative min-w-0", className)}>
@@ -157,7 +160,10 @@ export function MoneyInput({
         placeholder={placeholder ?? "0,00"}
         onFocus={() => {
           setFocused(true)
-          setDraft(displayDecimal(value))
+          const draftVal = typeof value === "number" && Number.isFinite(value) 
+            ? value.toFixed(2).replace(".", ",") 
+            : displayDecimal(value)
+          setDraft(draftVal)
         }}
         onBlur={() => setFocused(false)}
         onChange={(e) => {
