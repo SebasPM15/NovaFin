@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Check, HelpCircle, LayoutDashboard, Loader2, Settings2, Sliders, Target } from "lucide-react"
+import { Check, HelpCircle, LayoutDashboard, Loader2, Settings2, Sliders, Target, Bell } from "lucide-react"
 import { useNovaFin } from "@/hooks/use-novafin"
 import { OnboardingWizard } from "@/components/novafin/onboarding-wizard"
 import { ResumenTab } from "@/components/novafin/resumen-tab"
@@ -39,44 +39,79 @@ export default function Page() {
   }
 
   return (
-    <main className="mx-auto min-h-screen max-w-5xl px-4 py-8 sm:px-6">
-      {/* Header */}
-      <header className="flex items-end justify-between border-b border-border pb-5">
-        <div className="flex items-center gap-3">
-          <span className="grid size-10 place-items-center rounded-xl bg-primary text-primary-foreground">
-            <span className="font-display text-lg font-extrabold">N</span>
-          </span>
-          <div>
-            <h1 className="font-display text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
-              NovaFin
-            </h1>
-            <p className="text-sm text-muted-foreground">Simulador de finanzas y metas</p>
+    <div className="flex min-h-screen flex-col bg-background">
+      {/* Header Edge-to-Edge */}
+      <header className="sticky top-0 z-50 w-full border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="mx-auto flex h-20 w-full max-w-[1600px] items-center justify-between px-4 sm:px-6 lg:px-8">
+          
+          {/* Left: Branding Logo */}
+          <div className="flex items-center gap-3">
+            <img 
+              src="/logo-novafin.png" 
+              alt="NovaFin Simulador" 
+              className="h-12 w-auto object-contain sm:h-14 lg:h-16" 
+            />
           </div>
-        </div>
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          {nf.saveState === "saving" ? (
-            <>
-              <Loader2 className="size-3.5 animate-spin" />
-              guardando
-            </>
-          ) : nf.saveState === "saved" ? (
-            <>
-              <Check className="size-3.5 text-primary" />
-              guardado
-            </>
-          ) : null}
+
+          {/* Center: Tabs Desktop */}
+          <nav className="hidden scrollbar-none md:flex items-center gap-1 overflow-x-auto">
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setTab(t.id)}
+                className={cn(
+                  "inline-flex h-20 items-center gap-1.5 whitespace-nowrap border-b-2 px-4 text-sm font-medium transition-colors",
+                  tab === t.id
+                    ? "border-primary text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {t.icon}
+                {t.label}
+              </button>
+            ))}
+          </nav>
+
+          {/* Right: Usuario y Status */}
+          <div className="flex items-center gap-4">
+            <div className="hidden sm:flex flex-col items-end">
+              <span className="text-sm font-semibold text-foreground">Admin</span>
+              <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                {nf.saveState === "saving" ? (
+                  <>
+                    <Loader2 className="size-3 animate-spin" /> guardando
+                  </>
+                ) : nf.saveState === "saved" ? (
+                  <>
+                    guardado <Check className="size-3 text-primary" />
+                  </>
+                ) : null}
+              </div>
+            </div>
+            <div className="flex items-center gap-3 border-l border-border/50 pl-4">
+              <button className="text-muted-foreground hover:text-foreground transition-colors">
+                <Bell className="size-5" />
+              </button>
+              <img 
+                src="/logo-perfil.png" 
+                alt="Perfil" 
+                className="size-9 rounded-full object-cover ring-2 ring-primary/20 aspect-square" 
+              />
+            </div>
+          </div>
         </div>
       </header>
 
-      {/* Tabs */}
-      <nav className="scrollbar-none -mb-px mt-4 flex gap-1 overflow-x-auto border-b border-border">
+      {/* Tabs Mobile */}
+      <nav className="md:hidden flex scrollbar-none overflow-x-auto border-b border-border bg-background/50 px-2">
         {TABS.map((t) => (
           <button
             key={t.id}
             type="button"
             onClick={() => setTab(t.id)}
             className={cn(
-              "inline-flex items-center gap-1.5 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors",
+              "inline-flex h-12 items-center gap-1.5 whitespace-nowrap border-b-2 px-4 text-xs font-medium transition-colors",
               tab === t.id
                 ? "border-primary text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground",
@@ -88,7 +123,8 @@ export default function Page() {
         ))}
       </nav>
 
-      {/* Content */}
+      {/* Main Container para el body */}
+      <main className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 flex-1">
       <section className="py-6">
         {tab === "resumen" && <ResumenTab config={nf.config} proyeccion={nf.proyeccion} metas={nf.metas} />}
         {tab === "config" && <ConfigTab config={nf.config} setConfig={nf.setConfig} onReset={nf.resetAll} />}
@@ -123,7 +159,7 @@ export default function Page() {
       </section>
 
       {/* Footer */}
-      <footer className="mt-10 border-t border-border pt-6 pb-4 text-center">
+      <footer className="mt-auto w-full border-t border-border pt-6 pb-4 text-center">
         <p className="text-[11px] uppercase tracking-widest text-muted-foreground">
           Diseñado y desarrollado por <strong className="text-foreground">Ing. Mateo Pilco</strong>
         </p>
@@ -132,5 +168,6 @@ export default function Page() {
       {/* Floating Global Widgets */}
       <CalculatorWidget />
     </main>
+    </div>
   )
 }
