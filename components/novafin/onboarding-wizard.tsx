@@ -220,11 +220,12 @@ export function OnboardingWizard({ onComplete }: Readonly<{ onComplete: (config:
     <div className="flex min-h-screen items-center justify-center px-4 py-10">
       <div className="w-full max-w-lg">
         {/* Brand */}
-        <div className="mb-6 flex items-center justify-center gap-2">
-          <span className="grid size-8 place-items-center rounded-lg bg-primary text-primary-foreground">
-            <Sparkles className="size-4" />
-          </span>
-          <span className="font-display text-xl font-extrabold tracking-tight text-foreground">NovaFin</span>
+        <div className="mb-8 flex items-center justify-center">
+          <img 
+            src="/logo-novafin.png" 
+            alt="NovaFin Simulador" 
+            className="h-16 w-auto object-contain sm:h-20"
+          />
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-xl">
