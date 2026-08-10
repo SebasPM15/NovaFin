@@ -1,7 +1,7 @@
 "use client"
 
-import { useMemo } from "react"
-import { Banknote, Cake, PiggyBank, ShoppingBag, Target, TrendingUp, Wallet } from "lucide-react"
+import { useMemo, useState } from "react"
+import { Banknote, Cake, History, PiggyBank, ShoppingBag, Target, TrendingUp, Wallet, X } from "lucide-react"
 import {
   type Config,
   type Cuenta,
@@ -80,6 +80,12 @@ export function ResumenTab({
 
   const disponibleMes = config.gastoBase - (config.descuentoActivo ? config.descuentoMonto : 0)
 
+  // ── Split projection into past and current+future ──
+  const filasPasadas = proyeccion.filter((f) => compareKeys(f.mes, currentMonthKey) < 0)
+  const filasActuales = proyeccion.filter((f) => compareKeys(f.mes, currentMonthKey) >= 0)
+
+  const [showHistory, setShowHistory] = useState(false)
+
   return (
     <div className="space-y-6">
       {/* Account cards — dynamic per cuenta */}
@@ -138,6 +144,18 @@ export function ResumenTab({
       </Panel>
 
       {/* Ledger table */}
+      {filasPasadas.length > 0 && (
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => setShowHistory(true)}
+            className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+          >
+            <History className="size-3.5" />
+            Ver historial ({filasPasadas.length} {filasPasadas.length === 1 ? "mes anterior" : "meses anteriores"})
+          </button>
+        </div>
+      )}
       <div className="overflow-x-auto rounded-xl border border-border">
         <table className="w-full text-sm tnum min-w-[900px]">
           <thead>
@@ -154,7 +172,7 @@ export function ResumenTab({
             </tr>
           </thead>
           <tbody>
-            {proyeccion.map((f, i) => {
+            {filasActuales.map((f, i) => {
               const alcances = metasAlcanzablesPorMes[f.mes] || []
               const compras = metasCompradasPorMes[f.mes] || []
               const esCumple =
@@ -318,6 +336,104 @@ export function ResumenTab({
           </tbody>
         </table>
       </div>
+
+      {/* History Modal */}
+      {showHistory && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-background/95 backdrop-blur-sm">
+          {/* Modal header */}
+          <div className="flex items-center justify-between border-b border-border px-6 py-4 shrink-0">
+            <div className="flex items-center gap-2">
+              <History className="size-4 text-muted-foreground" />
+              <span className="text-sm font-semibold text-foreground">Historial — meses anteriores</span>
+              <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] text-muted-foreground">{filasPasadas.length} meses</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowHistory(false)}
+              className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-destructive/40 hover:text-destructive"
+            >
+              <X className="size-3.5" />
+              Cerrar
+            </button>
+          </div>
+          {/* Modal body — scrollable */}
+          <div className="flex-1 overflow-auto p-6">
+            <div className="overflow-x-auto rounded-xl border border-border">
+              <table className="w-full text-sm tnum min-w-[900px]">
+                <thead>
+                  <tr className="border-b border-border text-left text-[11px] text-muted-foreground">
+                    <th className="px-3 py-2.5 font-medium">Mes</th>
+                    <th className="px-3 py-2.5 text-right font-medium text-primary/70">+ Base</th>
+                    <th className="px-3 py-2.5 text-right font-medium text-primary/70">Ajuste ±</th>
+                    <th className="px-3 py-2.5 text-right font-medium text-milestone/90">Ingresos</th>
+                    <th className="px-3 py-2.5 text-right font-medium text-primary/70">- Compras</th>
+                    <th className="px-3 py-2.5 text-right font-medium text-primary">Saldo Ahorro</th>
+                    <th className="px-3 py-2.5 text-right font-medium text-accent/70">+ Disp.</th>
+                    <th className="px-3 py-2.5 text-right font-medium text-destructive/80">- Gastado</th>
+                    <th className="px-3 py-2.5 text-right font-medium text-accent">Sobrante</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...filasPasadas].reverse().map((f, i) => {
+                    const alcances = metasAlcanzablesPorMes[f.mes] || []
+                    const compras = metasCompradasPorMes[f.mes] || []
+                    const ss = f.sobresueldosDelMes || { decimoTercero: 0, decimoCuarto: 0, fondosReserva: 0 }
+                    const tieneSobresueldos = ss.decimoTercero > 0 || ss.decimoCuarto > 0 || ss.fondosReserva > 0
+                    const totalIngresos = (f.ingresosDelMes || 0) + ss.decimoTercero + ss.decimoCuarto + ss.fondosReserva
+                    return (
+                      <tr
+                        key={f.mes}
+                        className={cn(
+                          "transition-colors opacity-80",
+                          i % 2 === 1 && "bg-secondary/20",
+                        )}
+                      >
+                        <td className="whitespace-nowrap px-3 py-2 align-top">
+                          <div className="flex items-center gap-1 font-sans capitalize text-muted-foreground">
+                            {f.label}
+                            {f.tieneRealAhorro && <span title="Saldo real registrado" className="text-[10px] text-primary">★</span>}
+                            {f.tieneRealGastos && <span title="Sobrante real registrado" className="text-[10px] text-accent">★</span>}
+                          </div>
+                          {(alcances.length > 0 || compras.length > 0 || tieneSobresueldos) && (
+                            <div className="mt-1.5 flex flex-col gap-1">
+                              {compras.map((m) => (
+                                <Tag key={m.id} tone="neutral" icon={<ShoppingBag className="size-3" />}>{m.nombre}</Tag>
+                              ))}
+                              {ss.decimoTercero > 0 && <Tag tone="milestone" icon={<Banknote className="size-3" />}>D13 (+${fmt(ss.decimoTercero)})</Tag>}
+                              {ss.decimoCuarto > 0 && <Tag tone="milestone" icon={<Banknote className="size-3" />}>D14 (+${fmt(ss.decimoCuarto)})</Tag>}
+                              {ss.fondosReserva > 0 && <Tag tone="milestone" icon={<Banknote className="size-3" />}>FR (+${fmt(ss.fondosReserva)})</Tag>}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-right align-top text-xs text-primary/50">{fmt(f.depositoBase)}</td>
+                        <td className={cn("px-3 py-2 text-right align-top", f.ajustesDelMes < 0 ? "text-destructive" : f.ajustesDelMes > 0 ? "text-accent" : "text-muted-foreground")}>
+                          {f.ajustesDelMes !== 0 ? fmt(f.ajustesDelMes) : "—"}
+                        </td>
+                        <td className="px-3 py-2 text-right align-top text-milestone/90">
+                          {totalIngresos > 0 ? `+${fmt(totalIngresos)}` : "—"}
+                        </td>
+                        <td className="px-3 py-2 text-right align-top text-muted-foreground">
+                          {f.comprasDelMes ? `-${fmt(f.comprasDelMes)}` : "—"}
+                        </td>
+                        <td className="border-x border-border/60 bg-primary/[0.04] px-3 py-2 text-right align-top font-medium text-primary">
+                          {fmt(f.ahorroAcumulado)}
+                        </td>
+                        <td className="px-3 py-2 text-right align-top text-xs text-accent/50">{fmt(f.disponibleBase)}</td>
+                        <td className="px-3 py-2 text-right align-top text-destructive/80">
+                          {f.gastado ? `-${fmt(f.gastado)}` : "—"}
+                        </td>
+                        <td className="border-l border-border/60 bg-accent/[0.04] px-3 py-2 text-right align-top font-medium text-accent">
+                          {fmt(f.gastosAcumulado)}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
