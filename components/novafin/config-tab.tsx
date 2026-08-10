@@ -1,9 +1,9 @@
 "use client"
 
-import { useRef, type Dispatch, type SetStateAction } from "react"
+import { type Dispatch, type SetStateAction } from "react"
 import {
   Banknote, CalendarRange, Check, PiggyBank, Plus, RotateCcw,
-  Settings2, Trash2, User, Wallet, DownloadCloud, UploadCloud
+  Settings2, Trash2, User, Wallet
 } from "lucide-react"
 import {
   type Config, type Cuenta, type ModeloCuentas, type ModificadorBase,
@@ -11,6 +11,7 @@ import {
 } from "@/lib/finance"
 import { Field, MoneyInput, Panel, SectionLabel, TextInput, parseDecimal, toneFromTipo } from "./ui-kit"
 import { cn } from "@/lib/utils"
+
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function iconCuenta(tipo: Cuenta["tipo"]) {
@@ -185,7 +186,6 @@ export function ConfigTab({
   setConfig: Dispatch<SetStateAction<Config>>
   onReset: () => void
 }>) {
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const set = (patch: Partial<Config>) => setConfig((c) => ({ ...c, ...patch }))
 
   // Change account model: rebuild cuentas array from template
@@ -890,45 +890,6 @@ export function ConfigTab({
           <Plus className="size-4" />
           Añadir descuento temporal
         </button>
-      </Panel>
-
-      {/* ── Portabilidad de Datos (Backups) ── */}
-      <Panel>
-        <div className="mb-4">
-          <div className="text-sm font-medium text-foreground">Portabilidad y Respaldos (JSON)</div>
-          <div className="text-xs text-muted-foreground mt-1">Exporta tu configuración a un archivo para tener un respaldo o para cargarlo en otro dispositivo.</div>
-        </div>
-        <div className="flex flex-col sm:flex-row gap-3">
-          <button
-            type="button"
-            onClick={() => exportBackup()}
-            className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-secondary/20 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary/40 cursor-pointer"
-          >
-            <DownloadCloud className="size-4 text-primary" />
-            Descargar Respaldo
-          </button>
-          
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-secondary/20 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary/40 cursor-pointer"
-          >
-            <UploadCloud className="size-4 text-accent" />
-            Importar Archivo
-          </button>
-          <input 
-            ref={fileInputRef}
-            type="file" 
-            accept=".json" 
-            style={{ display: "none" }}
-            onChange={(e) => {
-              const file = e.target.files?.[0]
-              if (!file) return
-              void importBackup(file)
-              e.target.value = ""
-            }}
-          />
-        </div>
       </Panel>
 
       {/* ── Reset ── */}
