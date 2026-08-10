@@ -12,7 +12,7 @@ import {
   type IngresosPorMes,
   type SaldosReales,
   type TransferenciasPorMes,
-  fmt, monthLabel, uid, cuentaGastosId, cuentaAhorroId,
+  fmt, monthLabel, uid, cuentaGastosId, cuentaAhorroId, nowKey,
 } from "@/lib/finance"
 import { Field, MoneyInput, Segmented, TextInput, parseDecimal, toneFromTipo } from "./ui-kit"
 import { cn } from "@/lib/utils"
@@ -443,9 +443,18 @@ export function ControlTab({
   transferenciasPorMes: TransferenciasPorMes
   setTransferenciasPorMes: Dispatch<SetStateAction<TransferenciasPorMes>>
 }) {
-  const [mes, setMes] = useState(config.mesInicio)
+  const [mes, setMes] = useState(() => {
+    const currentKey = nowKey()
+    const exists = proyeccion.some((f) => f.mes === currentKey)
+    return exists ? currentKey : config.mesInicio
+  })
+
   useEffect(() => {
-    if (!proyeccion.find((f) => f.mes === mes)) setMes(config.mesInicio)
+    if (!proyeccion.some((f) => f.mes === mes)) {
+      const currentKey = nowKey()
+      const exists = proyeccion.some((f) => f.mes === currentKey)
+      setMes(exists ? currentKey : config.mesInicio)
+    }
   }, [proyeccion, config.mesInicio, mes])
 
   const fila = useMemo(() => proyeccion.find((f) => f.mes === mes) || proyeccion[0], [proyeccion, mes])
