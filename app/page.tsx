@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Check, HelpCircle, LayoutDashboard, Loader2, Settings2, Sliders, Target, Bell } from "lucide-react"
+import { Check, HelpCircle, LayoutDashboard, Loader2, MonitorSmartphone, Settings2, Sliders, Target, Bell } from "lucide-react"
 import { useNovaFin } from "@/hooks/use-novafin"
 import { OnboardingWizard } from "@/components/novafin/onboarding-wizard"
 import { ResumenTab } from "@/components/novafin/resumen-tab"
@@ -9,16 +9,18 @@ import { ConfigTab } from "@/components/novafin/config-tab"
 import { ControlTab } from "@/components/novafin/control-tab"
 import { MetasTab } from "@/components/novafin/metas-tab"
 import { AyudaTab } from "@/components/novafin/ayuda-tab"
+import { SyncTab } from "@/components/novafin/sync-tab"
 import { CalculatorWidget } from "@/components/novafin/calculator"
 import { cn } from "@/lib/utils"
 
-type TabId = "resumen" | "config" | "control" | "metas" | "ayuda"
+type TabId = "resumen" | "config" | "control" | "metas" | "sync" | "ayuda"
 
 const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: "resumen", label: "Resumen", icon: <LayoutDashboard className="size-4" /> },
   { id: "config", label: "Configuración", icon: <Settings2 className="size-4" /> },
   { id: "control", label: "Control mensual", icon: <Sliders className="size-4" /> },
   { id: "metas", label: "Metas", icon: <Target className="size-4" /> },
+  { id: "sync", label: "Sincronización", icon: <MonitorSmartphone className="size-4" /> },
   { id: "ayuda", label: "Ayuda", icon: <HelpCircle className="size-4" /> },
 ]
 
@@ -128,6 +130,18 @@ export default function Page() {
       <section className="py-6">
         {tab === "resumen" && <ResumenTab config={nf.config} proyeccion={nf.proyeccion} metas={nf.metas} />}
         {tab === "config" && <ConfigTab config={nf.config} setConfig={nf.setConfig} onReset={nf.resetAll} />}
+        {tab === "sync" && (
+          <SyncTab
+            syncEnabled={nf.syncEnabled}
+            syncStatus={nf.syncStatus}
+            syncConflict={nf.syncConflict}
+            onEnableSync={nf.enableSync}
+            onPairWithCode={nf.pairWithCode}
+            onConfirmPairAndReplace={nf.confirmPairAndReplace}
+            onResolveConflict={nf.resolveConflict}
+            onDisableSync={nf.disableSync}
+          />
+        )}
         {tab === "control" && (
           <ControlTab
             config={nf.config}
