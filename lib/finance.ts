@@ -353,12 +353,14 @@ function fraccionMesTrabajado(inicio: Date, y: number, m: number): number {
   const startD = inicio.getUTCDate()
   // Before start month → 0
   if (y < startY || (y === startY && m < startM)) return 0
-  // Same year/month → partial
+  // Same year/month → partial, using Ecuadorian 30-day labor base
+  // "días trabajados" = 30 - startD + 1, capped to [0, 30]
+  // e.g. startD=19: 30 - 19 + 1 = 12 days → 12/30
   if (y === startY && m === startM) {
-    const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate()
-    return Math.max(0, (daysInMonth - startD + 1) / daysInMonth)
+    const diasTrabajados = Math.min(Math.max(30 - startD + 1, 0), 30)
+    return diasTrabajados / 30
   }
-  // After start month → full
+  // After start month → full (= 30/30 = 1)
   return 1
 }
 
